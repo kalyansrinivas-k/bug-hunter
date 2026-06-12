@@ -106,16 +106,16 @@ Calculate and display a final score at game end based on path coverage and bugs 
 **Scope:**
 
 ```
-Path Score   = (dots collected / total dots) × 100
-Bug Score    = (bugs caught / total bugs spawned) × 100
-Final Score  = (Path Score × 0.6) + (Bug Score × 0.4)
+Path Score         = (dots collected / total dots) × 100
+Bug Score          = (bugs caught / total bugs spawned) × 100
+Release Confidence = (Path Score × 0.6) + (Bug Score × 0.4)
 ```
 
 - Score is calculated at game end (time runs out or all lives lost)
-- Game over screen shows breakdown: dots collected, bugs caught, path %, bug %, final score
+- Game over screen shows breakdown: dots collected, bugs caught, path %, bug %, Release Confidence
 - Example runs:
 
-| Dots | Bugs Caught | Path Score | Bug Score | Final |
+| Dots | Bugs Caught | Path Score | Bug Score | Release Confidence |
 |---|---|---|---|---|
 | 75 / 100 | 2 / 5 | 75 | 40 | **61** |
 | 95 / 100 | 4 / 5 | 95 | 80 | **89** |
