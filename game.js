@@ -10,21 +10,28 @@ const ROWS   = 17;
 const SPEED  = 6;    // px per frame — evenly divides TILE=36 (6 frames/tile)
 
 const COLORS = {
-  wall:          '#2D1B4E',
-  wallBorder:    '#5C27F5',
-  dot:           '#94A3B8',
-  dotEaten:      'transparent',
-  player:        '#00B2BD',
-  playerGlow:    'rgba(0,178,189,0.4)',
-  background:    '#1A0B2E',
-  bugPatrol:     '#EF4444',
-  bugChase:      '#F97316',
-  bugGlowPatrol: 'rgba(239,68,68,0.30)',
-  bugGlowChase:  'rgba(249,115,22,0.40)',
+  wall:       '#2D1B4E',
+  wallBorder: '#5C27F5',
+  dot:        '#94A3B8',
+  dotEaten:   'transparent',
+  player:     '#00B2BD',
+  playerGlow: 'rgba(0,178,189,0.4)',
+  background: '#1A0B2E',
 };
 
+// One fixed color per bug slot (index 0–5); stays the same regardless of mode
+const BUG_COLORS = ['#EF4444','#F97316','#EAB308','#EC4899','#A855F7','#22C55E'];
+const BUG_GLOWS  = [
+  { soft: 'rgba(239,68,68,0.22)',   bright: 'rgba(239,68,68,0.50)'   },
+  { soft: 'rgba(249,115,22,0.22)',  bright: 'rgba(249,115,22,0.50)'  },
+  { soft: 'rgba(234,179,8,0.22)',   bright: 'rgba(234,179,8,0.50)'   },
+  { soft: 'rgba(236,72,153,0.22)',  bright: 'rgba(236,72,153,0.50)'  },
+  { soft: 'rgba(168,85,247,0.22)',  bright: 'rgba(168,85,247,0.50)'  },
+  { soft: 'rgba(34,197,94,0.22)',   bright: 'rgba(34,197,94,0.50)'   },
+];
+
 // ── Bug constants ──────────────────────────────────────
-const BUG_SIZE         = TILE - 8;
+const BUG_SIZE         = TILE - 12; // slightly smaller than player (TILE-6)
 const BUG_SPEED_PATROL = 3;
 const BUG_SPEED_CHASE  = 4;
 const BUG_SPEED_FAST   = 6;
@@ -37,6 +44,9 @@ const BUG_SPAWN_TILES = [
   { col: 9,  row: 4  },
   { col: 11, row: 4  },
 ];
+
+// Row 10 already has open path tiles at both edges — used as the tunnel row
+const TUNNEL_ROW = 10;
 
 // ── Maze layout ────────────────────────────────────────
 // 1 = wall, 0 = path (dot), 2 = path (no dot / spawn area)
@@ -208,9 +218,13 @@ function bindInput() {
 
 // ── Collision helpers ──────────────────────────────────
 function tileAt(px, py) {
-  const col = Math.floor(px / TILE);
+  let col = Math.floor(px / TILE);
   const row = Math.floor(py / TILE);
-  if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return 1;
+  if (row < 0 || row >= ROWS) return 1;
+  if (col < 0 || col >= COLS) {
+    if (row === TUNNEL_ROW) col = ((col % COLS) + COLS) % COLS; // wrap through tunnel
+    else return 1;
+  }
   return maze[row][col];
 }
 
@@ -246,15 +260,18 @@ function snapOnHit(v, dv) {
 // ── Bug AI ────────────────────────────────────────────
 
 function spawnBug(spawnIdx) {
-  const tile = BUG_SPAWN_TILES[spawnIdx % BUG_SPAWN_TILES.length];
+  const tile  = BUG_SPAWN_TILES[spawnIdx % BUG_SPAWN_TILES.length];
+  const cIdx  = bugs.length % BUG_COLORS.length;
   bugs.push({
     x:     tile.col * TILE,
     y:     tile.row * TILE,
     dx:    0,
-    dy:    BUG_SPEED_PATROL, // initial direction — patrol picks a new one at first wall
+    dy:    BUG_SPEED_PATROL,
     mode:  'patrol',
     speed: BUG_SPEED_PATROL,
     size:  BUG_SIZE,
+    color: BUG_COLORS[cIdx],
+    glow:  BUG_GLOWS[cIdx],
   });
   bugsTotalSpawned++;
 }
@@ -369,6 +386,12 @@ function moveBug(bug) {
     bug.dx = 0;
     bug.dy = 0;
   }
+
+  // Tunnel warp
+  if (Math.round(bug.y / TILE) === TUNNEL_ROW) {
+    if (bug.x <= -TILE)            bug.x += COLS * TILE;
+    else if (bug.x >= COLS * TILE) bug.x -= COLS * TILE;
+  }
 }
 
 function moveBugs() {
@@ -432,6 +455,12 @@ function movePlayer() {
   }
 
   eatDot();
+
+  // Tunnel warp — row 10 connects both edges of the maze
+  if (Math.round(player.y / TILE) === TUNNEL_ROW) {
+    if (player.x <= -TILE)            player.x += COLS * TILE;
+    else if (player.x >= COLS * TILE) player.x -= COLS * TILE;
+  }
 }
 
 function eatDot() {
@@ -592,44 +621,54 @@ function drawPlayer() {
 
 function drawBugs() {
   for (const bug of bugs) {
-    const cx = bug.x + bug.size / 2 + 4;
-    const cy = bug.y + bug.size / 2 + 4;
-    const r  = bug.size / 2;
-    const isChaser = bug.mode === 'chase';
+    const cx      = bug.x + bug.size / 2 + 6;
+    const cy      = bug.y + bug.size / 2 + 6;
+    const r       = bug.size / 2;
+    const chasing = bug.mode === 'chase';
+    const glowClr = chasing ? bug.glow.bright : bug.glow.soft;
 
     // Glow
-    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 1.6);
-    grad.addColorStop(0, isChaser ? COLORS.bugGlowChase : COLORS.bugGlowPatrol);
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 1.7);
+    grad.addColorStop(0, glowClr);
     grad.addColorStop(1, 'transparent');
     ctx.beginPath();
-    ctx.arc(cx, cy, r * 1.6, 0, Math.PI * 2);
+    ctx.arc(cx, cy, r * 1.7, 0, Math.PI * 2);
     ctx.fillStyle = grad;
     ctx.fill();
+
+    // Chase ring — white outline signals aggression regardless of color
+    if (chasing) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, r + 3, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+      ctx.lineWidth   = 1.5;
+      ctx.stroke();
+    }
 
     // Body
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fillStyle = isChaser ? COLORS.bugChase : COLORS.bugPatrol;
+    ctx.fillStyle = bug.color;
     ctx.fill();
 
     // Eyes face toward movement direction
     const ex = bug.dx > 0 ? 3 : bug.dx < 0 ? -3 : 0;
     const ey = bug.dy > 0 ? 3 : bug.dy < 0 ? -3 : 0;
     ctx.fillStyle = COLORS.background;
-    ctx.beginPath(); ctx.arc(cx + ex - 3, cy + ey - 2, 2.5, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(cx + ex + 3, cy + ey - 2, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + ex - 3, cy + ey - 2, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + ex + 3, cy + ey - 2, 2, 0, Math.PI * 2); ctx.fill();
 
     // Antennae
-    ctx.strokeStyle = isChaser ? COLORS.bugChase : COLORS.bugPatrol;
+    ctx.strokeStyle = bug.color;
     ctx.lineWidth   = 1.5;
-    ctx.beginPath(); ctx.moveTo(cx - 3, cy - r); ctx.lineTo(cx - 6, cy - r - 6); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(cx + 3, cy - r); ctx.lineTo(cx + 6, cy - r - 6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - 3, cy - r); ctx.lineTo(cx - 6, cy - r - 5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + 3, cy - r); ctx.lineTo(cx + 6, cy - r - 5); ctx.stroke();
 
     // Legs (3 pairs)
     for (let i = 0; i < 3; i++) {
       const ly = cy - r * 0.3 + i * (r * 0.38);
-      ctx.beginPath(); ctx.moveTo(cx - r, ly); ctx.lineTo(cx - r - 6, ly - 3); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(cx + r, ly); ctx.lineTo(cx + r + 6, ly - 3); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx - r, ly); ctx.lineTo(cx - r - 5, ly - 3); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx + r, ly); ctx.lineTo(cx + r + 5, ly - 3); ctx.stroke();
     }
   }
 }
