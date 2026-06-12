@@ -90,9 +90,14 @@ let deathPause = false;
 
 // Bugs
 let bugs = [];
-let bugEscalation   = 0;  // 0 = initial, 1 = mid, 2 = late
-let bugsCaught      = 0;  // bombs kills — scored in Feature 3
-let bugsTotalSpawned = 0; // denominator for bug score
+let bugEscalation    = 0;  // 0 = initial, 1 = mid, 2 = late
+let bugsCaught       = 0;  // bomb kills — feeds end-game score
+let bugsTotalSpawned = 0;  // denominator for bug score
+
+// Bombs
+let bombBudget  = 4;   // total bombs left to place (no refill on respawn)
+let activeBombs = [];  // currently placed, waiting to detonate
+let blastFlash  = null; // { tiles: Set<string>, framesLeft: number }
 
 // Input
 const keys = {};
@@ -157,6 +162,10 @@ function resetGame() {
   bugsTotalSpawned = 0;
   spawnBugs(3);
 
+  bombBudget  = 4;
+  activeBombs = [];
+  blastFlash  = null;
+
   player = {
     // pixel position (top-left of sprite)
     x: 10 * TILE,
@@ -209,6 +218,7 @@ function bindInput() {
       case 'ArrowDown':  case 's': case 'S': player.nextDx=0;  player.nextDy= SPEED; break;
       case 'ArrowLeft':  case 'a': case 'A': player.nextDx=-SPEED; player.nextDy=0; break;
       case 'ArrowRight': case 'd': case 'D': player.nextDx= SPEED; player.nextDy=0; break;
+      case ' ': case 'b': case 'B': placeBomb(); break;
       case 'l': case 'L': toggleLeaderboard(); return; // don't preventDefault
     }
     e.preventDefault();
@@ -476,6 +486,81 @@ function eatDot() {
   }
 }
 
+// ── Bomb Mechanics ─────────────────────────────────────
+
+function placeBomb() {
+  if (!gameActive || deathPause) return;
+  if (bombBudget <= 0 || activeBombs.length >= 2) return;
+
+  const col = Math.round(player.x / TILE);
+  const row = Math.round(player.y / TILE);
+
+  // Don't stack two bombs on the same tile
+  if (activeBombs.some(b => b.col === col && b.row === row)) return;
+
+  activeBombs.push({ col, row, pulsePhase: 0 });
+  bombBudget--;
+  updateHUD();
+}
+
+// Returns the Set of "col,row" strings within blast range of a bomb.
+// Blast travels up to 2 corridor cells in each cardinal direction, stops at walls.
+function getBombBlastTiles(bomb) {
+  const tiles = new Set([`${bomb.col},${bomb.row}`]);
+  const DIRS  = [{ dc: 1, dr: 0 }, { dc: -1, dr: 0 }, { dc: 0, dr: 1 }, { dc: 0, dr: -1 }];
+  for (const d of DIRS) {
+    for (let step = 1; step <= 2; step++) {
+      const nc = bomb.col + d.dc * step;
+      const nr = bomb.row + d.dr * step;
+      if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) break;
+      if (maze[nr][nc] === 1) break; // wall absorbs blast
+      tiles.add(`${nc},${nr}`);
+    }
+  }
+  return tiles;
+}
+
+function detonateBomb(bombIdx, blastTiles) {
+  activeBombs.splice(bombIdx, 1);
+
+  // Kill every bug whose tile overlaps the blast
+  for (let i = bugs.length - 1; i >= 0; i--) {
+    const bc = Math.round(bugs[i].x / TILE);
+    const br = Math.round(bugs[i].y / TILE);
+    if (blastTiles.has(`${bc},${br}`)) {
+      bugs.splice(i, 1);
+      bugsCaught++;
+    }
+  }
+
+  // Kill player if caught in blast
+  const pc = Math.round(player.x / TILE);
+  const pr = Math.round(player.y / TILE);
+  if (blastTiles.has(`${pc},${pr}`)) triggerDeath();
+
+  showBlast(blastTiles);
+  updateHUD();
+}
+
+function checkBombDetonations() {
+  if (!gameActive || deathPause) return;
+  for (let i = activeBombs.length - 1; i >= 0; i--) {
+    const blastTiles = getBombBlastTiles(activeBombs[i]);
+    for (const bug of bugs) {
+      const bc = Math.round(bug.x / TILE);
+      const br = Math.round(bug.y / TILE);
+      if (blastTiles.has(`${bc},${br}`)) {
+        detonateBomb(i, blastTiles);
+        break; // bomb is gone; move to next bomb index
+      }
+    }
+  }
+}
+
+function showBlast(tiles) {
+  blastFlash = { tiles, framesLeft: 22 };
+}
+
 // ── Death ──────────────────────────────────────────────
 function triggerDeath() {
   if (deathPause) return;
@@ -533,6 +618,7 @@ function updateHUD() {
   timerEl.classList.toggle('danger',  timeLeft <= 5);
 
   document.getElementById('hud-score').textContent = score;
+  document.getElementById('hud-bombs').textContent = bombBudget;
 
   const livesEl = document.getElementById('hud-lives');
   livesEl.innerHTML = '';
@@ -548,6 +634,8 @@ function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawMaze();
   drawDots();
+  drawBombs();  // under bugs so bugs walk "over" placed bombs
+  drawBlast();  // explosion flash on top of bombs but under entities
   drawBugs();
   drawPlayer();
 }
@@ -673,10 +761,67 @@ function drawBugs() {
   }
 }
 
+function drawBombs() {
+  for (const bomb of activeBombs) {
+    bomb.pulsePhase = (bomb.pulsePhase + 0.09) % (Math.PI * 2);
+    const pulse = 0.5 + 0.5 * Math.sin(bomb.pulsePhase); // 0→1
+
+    const cx = bomb.col * TILE + TILE / 2;
+    const cy = bomb.row * TILE + TILE / 2;
+    const r  = 8 + pulse * 3; // 8–11 px, breathing
+
+    // Outer glow
+    const glowR = r * 2.8 + pulse * 5;
+    const grad  = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+    grad.addColorStop(0, `rgba(229,128,134,${0.35 + pulse * 0.25})`);
+    grad.addColorStop(1, 'transparent');
+    ctx.beginPath();
+    ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Body (pink — --color-accent)
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = '#E58086';
+    ctx.fill();
+
+    // Fuse spark (yellow, pulses brighter)
+    ctx.beginPath();
+    ctx.arc(cx + 5, cy - r - 3, 2 + pulse * 2, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(251,191,36,${0.6 + pulse * 0.4})`;
+    ctx.fill();
+  }
+}
+
+function drawBlast() {
+  if (!blastFlash || blastFlash.framesLeft <= 0) return;
+  const alpha = blastFlash.framesLeft / 22;
+
+  // Fill each blast tile with a fading purple
+  ctx.fillStyle = `rgba(92,39,245,${alpha * 0.55})`;
+  for (const key of blastFlash.tiles) {
+    const [c, r] = key.split(',').map(Number);
+    ctx.fillRect(c * TILE, r * TILE, TILE, TILE);
+  }
+
+  // Bright pink border on each tile
+  ctx.strokeStyle = `rgba(229,128,134,${alpha})`;
+  ctx.lineWidth   = 2;
+  for (const key of blastFlash.tiles) {
+    const [c, r] = key.split(',').map(Number);
+    ctx.strokeRect(c * TILE + 1, r * TILE + 1, TILE - 2, TILE - 2);
+  }
+
+  blastFlash.framesLeft--;
+  if (blastFlash.framesLeft <= 0) blastFlash = null;
+}
+
 // ── Game Loop ──────────────────────────────────────────
 function gameLoop() {
   moveBugs();
   movePlayer();
+  checkBombDetonations();
   checkBugCollisions();
   draw();
   animFrame = requestAnimationFrame(gameLoop);
