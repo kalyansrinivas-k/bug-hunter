@@ -10,14 +10,33 @@ const ROWS   = 17;
 const SPEED  = 6;    // px per frame — evenly divides TILE=36 (6 frames/tile)
 
 const COLORS = {
-  wall:       '#2D1B4E',
-  wallBorder: '#5C27F5',
-  dot:        '#94A3B8',
-  dotEaten:   'transparent',
-  player:     '#00B2BD',
-  playerGlow: 'rgba(0,178,189,0.4)',
-  background: '#1A0B2E',
+  wall:          '#2D1B4E',
+  wallBorder:    '#5C27F5',
+  dot:           '#94A3B8',
+  dotEaten:      'transparent',
+  player:        '#00B2BD',
+  playerGlow:    'rgba(0,178,189,0.4)',
+  background:    '#1A0B2E',
+  bugPatrol:     '#EF4444',
+  bugChase:      '#F97316',
+  bugGlowPatrol: 'rgba(239,68,68,0.30)',
+  bugGlowChase:  'rgba(249,115,22,0.40)',
 };
+
+// ── Bug constants ──────────────────────────────────────
+const BUG_SIZE         = TILE - 8;
+const BUG_SPEED_PATROL = 3;
+const BUG_SPEED_CHASE  = 4;
+const BUG_SPEED_FAST   = 6;
+// Six spread-out spawn tiles (path cells, away from player start at col 10 row 16)
+const BUG_SPAWN_TILES = [
+  { col: 1,  row: 1  },
+  { col: 19, row: 1  },
+  { col: 1,  row: 6  },
+  { col: 19, row: 6  },
+  { col: 9,  row: 4  },
+  { col: 11, row: 4  },
+];
 
 // ── Maze layout ────────────────────────────────────────
 // 1 = wall, 0 = path (dot), 2 = path (no dot / spawn area)
@@ -58,6 +77,12 @@ let totalDots, dotsEaten;
 let gameActive, gameOver;
 let animFrame;
 let deathPause = false;
+
+// Bugs
+let bugs = [];
+let bugEscalation   = 0;  // 0 = initial, 1 = mid, 2 = late
+let bugsCaught      = 0;  // bombs kills — scored in Feature 3
+let bugsTotalSpawned = 0; // denominator for bug score
 
 // Input
 const keys = {};
@@ -116,6 +141,12 @@ function resetGame() {
   gameOver   = false;
   deathPause = false;
 
+  bugs             = [];
+  bugEscalation    = 0;
+  bugsCaught       = 0;
+  bugsTotalSpawned = 0;
+  spawnBugs(3);
+
   player = {
     // pixel position (top-left of sprite)
     x: 10 * TILE,
@@ -154,6 +185,7 @@ function startTimer() {
     if (!gameActive || deathPause) return;
     timeLeft--;
     updateHUD();
+    checkBugEscalation();
     if (timeLeft <= 0) endGame();
   }, DEBUG ? 300 : 1000); // 0.3s ticks in debug = ~3s total
 }
@@ -182,10 +214,10 @@ function tileAt(px, py) {
   return maze[row][col];
 }
 
-// Can the player occupy pixel rect (px,py,size,size)?
-function canMove(px, py) {
-  const margin = 3; // small padding so player feels tight but fair
-  const s = player.size - margin * 2;
+// Can a sprite of `size` occupy pixel rect starting at (px, py)?
+function canMoveAt(px, py, size) {
+  const margin = 3;
+  const s = size - margin * 2;
   const ox = margin, oy = margin;
   return (
     tileAt(px + ox,       py + oy)       !== 1 &&
@@ -194,6 +226,8 @@ function canMove(px, py) {
     tileAt(px + ox + s,   py + oy + s)   !== 1
   );
 }
+
+function canMove(px, py) { return canMoveAt(px, py, player.size); }
 
 // Snap to nearest tile boundary (used for turns at junctions)
 function snapToGrid(v) {
@@ -207,6 +241,155 @@ function snapOnHit(v, dv) {
   if (dv > 0) return Math.floor((v + m) / TILE) * TILE; // moving positive → snap back
   if (dv < 0) return Math.ceil((v - m) / TILE) * TILE;  // moving negative → snap forward
   return snapToGrid(v);
+}
+
+// ── Bug AI ────────────────────────────────────────────
+
+function spawnBug(spawnIdx) {
+  const tile = BUG_SPAWN_TILES[spawnIdx % BUG_SPAWN_TILES.length];
+  bugs.push({
+    x:     tile.col * TILE,
+    y:     tile.row * TILE,
+    dx:    0,
+    dy:    BUG_SPEED_PATROL, // initial direction — patrol picks a new one at first wall
+    mode:  'patrol',
+    speed: BUG_SPEED_PATROL,
+    size:  BUG_SIZE,
+  });
+  bugsTotalSpawned++;
+}
+
+function spawnBugs(count) {
+  for (let i = 0; i < count; i++) spawnBug(bugs.length);
+}
+
+function escalateBugs1() {
+  spawnBug(bugs.length); // 4th bug
+  let assigned = 0;
+  for (const bug of bugs) {
+    if (assigned < 2) { bug.mode = 'chase'; bug.speed = BUG_SPEED_CHASE; assigned++; }
+  }
+}
+
+function escalateBugs2() {
+  while (bugs.length < 6) spawnBug(bugs.length); // 5th and 6th
+  for (const bug of bugs) { bug.mode = 'chase'; bug.speed = BUG_SPEED_FAST; }
+}
+
+function checkBugEscalation() {
+  if (bugEscalation === 0 && timeLeft <= 40) {
+    bugEscalation = 1;
+    escalateBugs1();
+  } else if (bugEscalation === 1 && timeLeft <= 20) {
+    bugEscalation = 2;
+    escalateBugs2();
+  }
+}
+
+// BFS shortest path from bug tile to player tile.
+// Returns a unit direction {dx, dy} for the first step, or null if no path.
+function bfsDirection(fromX, fromY, toX, toY) {
+  const sc = Math.round(fromX / TILE);
+  const sr = Math.round(fromY / TILE);
+  const gc = Math.round(toX   / TILE);
+  const gr = Math.round(toY   / TILE);
+  if (sc === gc && sr === gr) return null;
+
+  const DIRS = [
+    { dc: 1, dr: 0, dx: 1, dy: 0 }, { dc: -1, dr: 0, dx: -1, dy: 0 },
+    { dc: 0, dr: 1, dx: 0, dy: 1 }, { dc:  0, dr: -1, dx: 0, dy: -1 },
+  ];
+  const queue   = [{ col: sc, row: sr, dir: null }];
+  const visited = new Set([`${sc},${sr}`]);
+
+  while (queue.length > 0) {
+    const { col, row, dir } = queue.shift();
+    for (const d of DIRS) {
+      const nc = col + d.dc, nr = row + d.dr;
+      if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) continue;
+      if (maze[nr][nc] === 1) continue;
+      const key = `${nc},${nr}`;
+      if (visited.has(key)) continue;
+      const firstDir = dir ?? { dx: d.dx, dy: d.dy };
+      if (nc === gc && nr === gr) return firstDir;
+      visited.add(key);
+      queue.push({ col: nc, row: nr, dir: firstDir });
+    }
+  }
+  return null;
+}
+
+function pickPatrolDir(bug) {
+  const DIRS = [
+    { dx: 1, dy: 0 }, { dx: -1, dy: 0 },
+    { dx: 0, dy: 1 }, { dx:  0, dy: -1 },
+  ];
+  // Fisher-Yates shuffle for random wandering
+  for (let i = DIRS.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [DIRS[i], DIRS[j]] = [DIRS[j], DIRS[i]];
+  }
+  const curNx   = bug.dx !== 0 ? Math.sign(bug.dx) : 0;
+  const curNy   = bug.dy !== 0 ? Math.sign(bug.dy) : 0;
+  const moving  = curNx !== 0 || curNy !== 0;
+  const ordered = moving
+    ? [...DIRS.filter(d => !(d.dx === -curNx && d.dy === -curNy)), { dx: -curNx, dy: -curNy }]
+    : DIRS;
+
+  for (const d of ordered) {
+    if (canMoveAt(bug.x + d.dx * TILE, bug.y + d.dy * TILE, bug.size)) {
+      bug.dx = d.dx * bug.speed;
+      bug.dy = d.dy * bug.speed;
+      return;
+    }
+  }
+}
+
+function moveBug(bug) {
+  // All bug speeds (3, 4, 6) evenly divide TILE=36, so bugs land on exact tile coords.
+  // Re-evaluate direction at every tile boundary.
+  if (bug.x % TILE === 0 && bug.y % TILE === 0) {
+    if (bug.mode === 'chase') {
+      const dir = bfsDirection(bug.x, bug.y, player.x, player.y);
+      if (dir) { bug.dx = dir.dx * bug.speed; bug.dy = dir.dy * bug.speed; }
+      else      { pickPatrolDir(bug); } // fallback: wander when cornered
+    } else {
+      pickPatrolDir(bug);
+    }
+  }
+
+  const nx = bug.x + bug.dx;
+  const ny = bug.y + bug.dy;
+  if (canMoveAt(nx, ny, bug.size)) {
+    bug.x = nx;
+    bug.y = ny;
+  } else {
+    bug.x = snapOnHit(bug.x, bug.dx);
+    bug.y = snapOnHit(bug.y, bug.dy);
+    bug.dx = 0;
+    bug.dy = 0;
+  }
+}
+
+function moveBugs() {
+  if (!gameActive || deathPause) return;
+  for (const bug of bugs) moveBug(bug);
+}
+
+function checkBugCollisions() {
+  if (!gameActive || deathPause) return;
+  const hitMargin = 8; // forgiveness so grazing doesn't kill
+  for (const bug of bugs) {
+    if (
+      player.x + hitMargin         < bug.x + bug.size &&
+      player.x + player.size - hitMargin > bug.x &&
+      player.y + hitMargin         < bug.y + bug.size &&
+      player.y + player.size - hitMargin > bug.y
+    ) {
+      triggerDeath();
+      return;
+    }
+  }
 }
 
 // ── Player movement ────────────────────────────────────
@@ -300,7 +483,9 @@ function endGame() {
   clearInterval(timerInterval);
 
   const pathPct = Math.round((dotsEaten / totalDots) * 100);
-  const bugPct  = 0; // bugs not in Feature 1
+  const bugPct  = bugsTotalSpawned > 0
+    ? Math.round((bugsCaught / bugsTotalSpawned) * 100)
+    : 0;
   const finalScore = Math.round(pathPct * 0.6 + bugPct * 0.4);
 
   document.getElementById('go-paths').textContent  = `${pathPct}%`;
@@ -334,6 +519,7 @@ function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawMaze();
   drawDots();
+  drawBugs();
   drawPlayer();
 }
 
@@ -404,9 +590,55 @@ function drawPlayer() {
   ctx.fill();
 }
 
+function drawBugs() {
+  for (const bug of bugs) {
+    const cx = bug.x + bug.size / 2 + 4;
+    const cy = bug.y + bug.size / 2 + 4;
+    const r  = bug.size / 2;
+    const isChaser = bug.mode === 'chase';
+
+    // Glow
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 1.6);
+    grad.addColorStop(0, isChaser ? COLORS.bugGlowChase : COLORS.bugGlowPatrol);
+    grad.addColorStop(1, 'transparent');
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 1.6, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Body
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = isChaser ? COLORS.bugChase : COLORS.bugPatrol;
+    ctx.fill();
+
+    // Eyes face toward movement direction
+    const ex = bug.dx > 0 ? 3 : bug.dx < 0 ? -3 : 0;
+    const ey = bug.dy > 0 ? 3 : bug.dy < 0 ? -3 : 0;
+    ctx.fillStyle = COLORS.background;
+    ctx.beginPath(); ctx.arc(cx + ex - 3, cy + ey - 2, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + ex + 3, cy + ey - 2, 2.5, 0, Math.PI * 2); ctx.fill();
+
+    // Antennae
+    ctx.strokeStyle = isChaser ? COLORS.bugChase : COLORS.bugPatrol;
+    ctx.lineWidth   = 1.5;
+    ctx.beginPath(); ctx.moveTo(cx - 3, cy - r); ctx.lineTo(cx - 6, cy - r - 6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + 3, cy - r); ctx.lineTo(cx + 6, cy - r - 6); ctx.stroke();
+
+    // Legs (3 pairs)
+    for (let i = 0; i < 3; i++) {
+      const ly = cy - r * 0.3 + i * (r * 0.38);
+      ctx.beginPath(); ctx.moveTo(cx - r, ly); ctx.lineTo(cx - r - 6, ly - 3); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx + r, ly); ctx.lineTo(cx + r + 6, ly - 3); ctx.stroke();
+    }
+  }
+}
+
 // ── Game Loop ──────────────────────────────────────────
 function gameLoop() {
+  moveBugs();
   movePlayer();
+  checkBugCollisions();
   draw();
   animFrame = requestAnimationFrame(gameLoop);
 }
