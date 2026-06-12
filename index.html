@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bug Hunter</title>
+  <link rel="stylesheet" href="testsigma-tokens.css" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- Landing Screen -->
+  <div id="screen-landing" class="screen active">
+    <div class="landing-glow"></div>
+    <div class="landing-card">
+      <div class="landing-eyebrow">Testsigma presents</div>
+      <h1 class="landing-title">Bug<span class="accent">Hunter</span></h1>
+      <p class="landing-subtitle">Navigate the maze. Cover every path. Catch the bugs.</p>
+      <form id="form-register" class="register-form" novalidate>
+        <div class="field">
+          <label for="input-name">Your name / nickname</label>
+          <input id="input-name" type="text" placeholder="e.g. QA Ninja" autocomplete="off" required />
+        </div>
+        <div class="field">
+          <label for="input-email">Email address</label>
+          <input id="input-email" type="email" placeholder="you@testsigma.com" autocomplete="off" required />
+        </div>
+        <div id="form-error" class="form-error hidden"></div>
+        <button type="submit" class="btn-primary">Start Game</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Game Screen -->
+  <div id="screen-game" class="screen">
+    <div class="game-layout">
+
+      <!-- HUD -->
+      <div class="hud">
+        <div class="hud-item">
+          <span class="hud-label">TIME</span>
+          <span id="hud-timer" class="hud-value mono">60</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">SCORE</span>
+          <span id="hud-score" class="hud-value mono">0</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">LIVES</span>
+          <div id="hud-lives" class="hud-lives"></div>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">BOMBS</span>
+          <span id="hud-bombs" class="hud-value mono">4</span>
+        </div>
+        <div class="hud-spacer"></div>
+        <button id="btn-toggle-lb" class="btn-hud-toggle" onclick="toggleLeaderboard()">
+          <span id="lb-toggle-label">[ L ] Leaderboard</span>
+        </button>
+      </div>
+
+      <!-- Main area: canvas + leaderboard -->
+      <div class="game-main">
+        <canvas id="game-canvas"></canvas>
+
+        <!-- Leaderboard sidebar -->
+        <div class="leaderboard-panel">
+          <div class="leaderboard-title">Leaderboard</div>
+          <div id="leaderboard-list" class="leaderboard-list">
+            <div class="leaderboard-empty">No scores yet</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Death overlay -->
+    <div id="overlay-death" class="overlay hidden">
+      <div class="overlay-content">
+        <div class="overlay-icon">💥</div>
+        <div class="overlay-text">Bug got you!</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Over Screen -->
+  <div id="screen-gameover" class="screen">
+    <div class="gameover-card">
+      <h2 class="gameover-title">Game Over</h2>
+      <div class="score-breakdown">
+        <div class="score-row">
+          <span class="score-label">Path Coverage</span>
+          <span id="go-paths" class="score-value">0%</span>
+        </div>
+        <div class="score-row">
+          <span class="score-label">Bugs Caught</span>
+          <span id="go-bugs" class="score-value">0%</span>
+        </div>
+        <div class="score-divider"></div>
+        <div class="score-row score-final">
+          <span class="score-label">Final Score</span>
+          <span id="go-final" class="score-value gradient-text">0</span>
+        </div>
+      </div>
+      <button id="btn-play-again" class="btn-primary">Play Again</button>
+      <button id="btn-leaderboard" class="btn-secondary">View Leaderboard</button>
+    </div>
+  </div>
+
+  <!-- Limit Reached Screen -->
+  <div id="screen-limit" class="screen">
+    <div class="landing-card">
+      <h2 class="landing-title">That's a wrap!</h2>
+      <p class="landing-subtitle">You've used all 3 attempts for today.<br/>Come back tomorrow to keep climbing the leaderboard.</p>
+      <button id="btn-limit-lb" class="btn-secondary">View Leaderboard</button>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
