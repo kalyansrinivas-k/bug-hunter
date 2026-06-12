@@ -172,11 +172,15 @@ Visual design and layout tuned for a large television display in an event settin
   - **Center/left**: Maze + gameplay (dominant area)
   - **Right sidebar**: Live leaderboard, always visible
   - **Top HUD**: Countdown timer, lives, current score, bombs remaining
+- **Player instructions** — two touchpoints so no one walks in blind:
+  - **Landing screen**: "How to Play" block between the subtitle and the registration form — 4 gameplay rules + keyboard shortcuts table (Arrow keys/WASD, Space/B for bombs, L for leaderboard)
+  - **Game start countdown**: 3-second overlay shown at game start and on Play Again — displays keyboard shortcuts, freezes all game logic (movement, timer, collisions) until the countdown completes
 - Game states:
 
 | State | Screen |
 |---|---|
-| Landing | Logo, instructions, Name + Email form, Play button |
+| Landing | Logo, How to Play block, Name + Email form, Play button |
+| Countdown | 3-2-1 overlay with key shortcuts — game paused until it clears |
 | Playing | Maze + HUD + leaderboard sidebar |
 | Death | Brief pause overlay, then resume |
 | Game Over | Score breakdown, leaderboard rank, Play Again (if attempts remain) |

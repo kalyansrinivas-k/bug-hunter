@@ -117,7 +117,35 @@ function initGame() {
   resetGame();
   bindInput();
   showScreen('game');
-  requestAnimationFrame(gameLoop);
+  animFrame = requestAnimationFrame(gameLoop);
+  startCountdown();
+}
+
+function startCountdown() {
+  deathPause = true;
+  const overlayEl = document.getElementById('overlay-countdown');
+  const numEl     = document.getElementById('countdown-number');
+  let   tick      = 3;
+
+  numEl.textContent = tick;
+  overlayEl.classList.remove('hidden');
+
+  const interval = setInterval(() => {
+    tick -= 1;
+    if (tick <= 0) {
+      clearInterval(interval);
+      overlayEl.classList.add('hidden');
+      deathPause = false;
+    } else {
+      numEl.textContent = tick;
+      // re-trigger CSS pop animation
+      numEl.classList.remove('countdown-pop-reset');
+      void numEl.offsetWidth;
+      numEl.style.animation = 'none';
+      void numEl.offsetWidth;
+      numEl.style.animation = '';
+    }
+  }, 1000);
 }
 
 function scaleCanvas() {
@@ -608,11 +636,23 @@ function endGame() {
   const bugPct     = bugsTotalSpawned > 0 ? Math.round((bugsCaught / bugsTotalSpawned) * 100) : 0;
   const finalScore = Math.round(pathPct * 0.6 + bugPct * 0.4);
 
+  const titleEl    = document.getElementById('go-title');
+  const subtitleEl = document.getElementById('go-subtitle');
+  if (finalScore >= 80) {
+    titleEl.textContent    = 'BUILD PASSED';
+    titleEl.className      = 'gameover-title passed';
+    subtitleEl.textContent = 'Release unblocked — ship it';
+  } else {
+    titleEl.textContent    = 'BUILD FAILED';
+    titleEl.className      = 'gameover-title failed';
+    subtitleEl.textContent = 'Bugs reached production';
+  }
+
   document.getElementById('go-paths-raw').textContent = `${dotsEaten} / ${totalDots}`;
   document.getElementById('go-bugs-raw').textContent  = `${bugsCaught} / ${bugsTotalSpawned}`;
   document.getElementById('go-paths').textContent     = `${pathPct}%`;
   document.getElementById('go-bugs').textContent      = `${bugPct}%`;
-  document.getElementById('go-final').textContent     = finalScore;
+  document.getElementById('go-final').textContent     = String(finalScore).padStart(3, '0');
 
   cancelAnimationFrame(animFrame);
   showScreen('gameover');
@@ -621,12 +661,12 @@ function endGame() {
 // ── HUD ────────────────────────────────────────────────
 function updateHUD() {
   const timerEl = document.getElementById('hud-timer');
-  timerEl.textContent = timeLeft;
+  timerEl.textContent = String(timeLeft).padStart(2, '0');
   timerEl.classList.toggle('warning', timeLeft <= 10 && timeLeft > 5);
   timerEl.classList.toggle('danger',  timeLeft <= 5);
 
   score = computeLiveScore(); // keep live score in sync with the final formula
-  document.getElementById('hud-score').textContent = score;
+  document.getElementById('hud-score').textContent = String(score).padStart(3, '0');
   document.getElementById('hud-bombs').textContent = bombBudget;
 
   const livesEl = document.getElementById('hud-lives');
@@ -642,6 +682,7 @@ function updateHUD() {
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawMaze();
+  drawGrid();
   drawDots();
   drawBombs();  // under bugs so bugs walk "over" placed bombs
   drawBlast();  // explosion flash on top of bombs but under entities
@@ -666,6 +707,20 @@ function drawMaze() {
       }
     }
   }
+}
+
+function drawGrid() {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(92, 39, 245, 0.13)';
+  ctx.lineWidth = 0.5;
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (maze[r][c] !== 1) {
+        ctx.strokeRect(c * TILE + 0.5, r * TILE + 0.5, TILE, TILE);
+      }
+    }
+  }
+  ctx.restore();
 }
 
 function drawDots() {
@@ -876,6 +931,7 @@ document.getElementById('btn-play-again').addEventListener('click', () => {
   resetGame();
   showScreen('game');
   animFrame = requestAnimationFrame(gameLoop);
+  startCountdown();
 });
 
 document.getElementById('btn-leaderboard').addEventListener('click', () => {

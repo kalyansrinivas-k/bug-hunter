@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Press+Start+2P&display=swap" rel="stylesheet" />
 </head>
 <body>
 
@@ -19,6 +19,21 @@
       <div class="landing-eyebrow">Testsigma presents</div>
       <h1 class="landing-title">Bug<span class="accent">Hunter</span></h1>
       <p class="landing-subtitle">Navigate the maze. Cover every path. Catch the bugs.</p>
+
+      <div class="how-to-play">
+        <div class="htp-title">How to play</div>
+        <ul class="htp-rules">
+          <li>Navigate the maze and collect all dots within 60 seconds</li>
+          <li>Bugs patrol and chase you — touching one costs a life (3 total)</li>
+          <li>Place bombs to catch bugs — 4 per game, max 2 active at once</li>
+        </ul>
+        <div class="htp-keys">
+          <div class="htp-key"><span class="kbd">↑ ↓ ← →</span> / <span class="kbd">W A S D</span> Move</div>
+          <div class="htp-key"><span class="kbd">Space</span> / <span class="kbd">B</span> Place bomb</div>
+          <div class="htp-key"><span class="kbd">L</span> Toggle leaderboard</div>
+        </div>
+      </div>
+
       <form id="form-register" class="register-form" novalidate>
         <div class="field">
           <label for="input-name">Your name / nickname</label>
@@ -81,7 +96,19 @@
     <div id="overlay-death" class="overlay hidden">
       <div class="overlay-content">
         <div class="overlay-icon">💥</div>
-        <div class="overlay-text">Bug got you!</div>
+        <div class="overlay-text">FATAL ERROR</div>
+      </div>
+    </div>
+
+    <!-- Countdown overlay -->
+    <div id="overlay-countdown" class="overlay hidden">
+      <div class="overlay-content">
+        <div id="countdown-number" class="countdown-number">3</div>
+        <div class="countdown-hint">
+          <span class="kbd">↑↓←→</span> / <span class="kbd">WASD</span> Move &nbsp;·&nbsp;
+          <span class="kbd">Space</span> / <span class="kbd">B</span> Bomb &nbsp;·&nbsp;
+          <span class="kbd">L</span> Leaderboard
+        </div>
       </div>
     </div>
   </div>
@@ -89,7 +116,8 @@
   <!-- Game Over Screen -->
   <div id="screen-gameover" class="screen">
     <div class="gameover-card">
-      <h2 class="gameover-title">Game Over</h2>
+      <h2 id="go-title" class="gameover-title">BUILD FAILED</h2>
+      <p id="go-subtitle" class="go-subtitle">Bugs reached production</p>
       <div class="score-breakdown">
         <div class="score-row">
           <span class="score-label">Path Coverage</span>
