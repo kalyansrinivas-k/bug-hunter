@@ -480,7 +480,6 @@ function eatDot() {
   if (dots[idx]) {
     dots[idx] = false;
     dotsEaten++;
-    score += 10;
     updateHUD();
     if (dotsEaten >= totalDots) endGame(); // all dots eaten
   }
@@ -591,20 +590,29 @@ function respawnPlayer() {
   player.nextDy = 0;
 }
 
+// ── Scoring ────────────────────────────────────────────
+
+// Live formula score (0–100), kept in sync with the final calculation.
+function computeLiveScore() {
+  const pathPct = totalDots > 0 ? (dotsEaten / totalDots) * 100 : 0;
+  const bugPct  = bugsTotalSpawned > 0 ? (bugsCaught / bugsTotalSpawned) * 100 : 0;
+  return Math.round(pathPct * 0.6 + bugPct * 0.4);
+}
+
 // ── End Game ───────────────────────────────────────────
 function endGame() {
   gameActive = false;
   clearInterval(timerInterval);
 
-  const pathPct = Math.round((dotsEaten / totalDots) * 100);
-  const bugPct  = bugsTotalSpawned > 0
-    ? Math.round((bugsCaught / bugsTotalSpawned) * 100)
-    : 0;
+  const pathPct    = totalDots > 0 ? Math.round((dotsEaten / totalDots) * 100) : 0;
+  const bugPct     = bugsTotalSpawned > 0 ? Math.round((bugsCaught / bugsTotalSpawned) * 100) : 0;
   const finalScore = Math.round(pathPct * 0.6 + bugPct * 0.4);
 
-  document.getElementById('go-paths').textContent  = `${pathPct}%`;
-  document.getElementById('go-bugs').textContent   = `${bugPct}%`;
-  document.getElementById('go-final').textContent  = finalScore;
+  document.getElementById('go-paths-raw').textContent = `${dotsEaten} / ${totalDots}`;
+  document.getElementById('go-bugs-raw').textContent  = `${bugsCaught} / ${bugsTotalSpawned}`;
+  document.getElementById('go-paths').textContent     = `${pathPct}%`;
+  document.getElementById('go-bugs').textContent      = `${bugPct}%`;
+  document.getElementById('go-final').textContent     = finalScore;
 
   cancelAnimationFrame(animFrame);
   showScreen('gameover');
@@ -617,6 +625,7 @@ function updateHUD() {
   timerEl.classList.toggle('warning', timeLeft <= 10 && timeLeft > 5);
   timerEl.classList.toggle('danger',  timeLeft <= 5);
 
+  score = computeLiveScore(); // keep live score in sync with the final formula
   document.getElementById('hud-score').textContent = score;
   document.getElementById('hud-bombs').textContent = bombBudget;
 

@@ -334,6 +334,18 @@ html, body {
 
 .score-label { color: var(--color-text-muted); }
 
+.score-stat {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.score-raw {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+}
+
 .score-value {
   font-family: var(--font-family-mono);
   font-weight: var(--font-weight-bold);
