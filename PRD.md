@@ -16,7 +16,7 @@ Bug Hunter is a browser-based arcade game targeted at QA professionals. Inspired
 
 ## 3. Event Structure
 
-- **Duration**: 3 days
+- **Duration**: 3 days — **June 16–18, 2026** (`Europe/Oslo`); set via `EVENT_START_DATE`
 - **Daily limit**: Each player (identified by email) may play up to 3 times per calendar day
 - **Daily best**: Of the 3 plays in a day, only the highest score counts as that player's day score
 - **Overall winner**: Sum of Day 1 best + Day 2 best + Day 3 best = final cumulative score

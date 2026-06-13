@@ -12,7 +12,7 @@
 
 const EVENT_CONFIG = {
   timezone:   'Europe/Oslo',
-  startDate:  '2026-06-13', // Day 1 anchor — event venue local calendar date
+  startDate:  '2026-06-16', // Day 1 anchor (event runs Jun 16–18, 2026, Oslo)
   dailyLimit: 3,            // max plays per email per day
   totalDays:  3,
 };
@@ -97,6 +97,12 @@ async function getLeaderboard() {
   const byEmail = new Map();
 
   for (const p of plays) {
+    // Only count plays within the event window (days 1..N). Anything before
+    // the event start date lands on day <= 0 and is ignored — this is what
+    // makes the leaderboard "reset" automatically on the event start date,
+    // with no destructive wipe of the internal test scores.
+    if (p.day < 1 || p.day > EVENT_CONFIG.totalDays) continue;
+
     if (!byEmail.has(p.email)) {
       byEmail.set(p.email, { email: p.email, nickname: p.nickname, dayBests: {} });
     }

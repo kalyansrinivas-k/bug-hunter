@@ -70,6 +70,28 @@ html, body {
   line-height: var(--line-height-normal);
 }
 
+/* ---- Landing layout: card centered left, top-5 docked right ---- */
+#screen-landing.active { display: flex; align-items: stretch; }
+
+.landing-layout {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  gap: clamp(16px, 1.5vw, 40px);
+  padding: clamp(16px, 2vw, 48px);
+  min-height: 0;
+}
+
+.landing-card-area {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto; /* tall card scrolls within its own area on short screens */
+}
+
 /* ---- Form ---- */
 .register-form { display: flex; flex-direction: column; gap: var(--space-4); }
 
@@ -143,13 +165,13 @@ html, body {
 /* ---- HUD ---- */
 .hud {
   display: flex;
-  gap: var(--space-6);
+  gap: clamp(20px, 2vw, 56px);
   align-items: center;
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
-  padding: var(--space-3) var(--space-6);
+  padding: clamp(10px, 0.9vw, 22px) clamp(20px, 1.6vw, 44px);
   box-shadow: var(--shadow-card);
   flex-shrink: 0;
 }
@@ -158,21 +180,21 @@ html, body {
 
 .hud-label {
   font-family: 'Press Start 2P', monospace;
-  font-size: 9px;
+  font-size: clamp(9px, 0.6vw, 16px);
   letter-spacing: 0;
   text-transform: uppercase;
   color: var(--color-text-muted);
 }
 
 .hud-value {
-  font-size: var(--font-size-large);
+  font-size: clamp(20px, 1.5vw, 38px);
   font-weight: var(--font-weight-bold);
   color: var(--color-text);
 }
 
 .hud-value.mono {
   font-family: 'Press Start 2P', monospace;
-  font-size: 18px;
+  font-size: clamp(18px, 1.5vw, 36px);
   letter-spacing: 0;
 }
 
@@ -182,7 +204,7 @@ html, body {
 .hud-lives { display: flex; gap: var(--space-2); align-items: center; }
 
 .life-dot {
-  width: 16px; height: 16px;
+  width: clamp(16px, 1.1vw, 26px); height: clamp(16px, 1.1vw, 26px);
   border-radius: 50%;
   background: var(--color-primary);
   box-shadow: 0 0 6px var(--color-primary);
@@ -192,10 +214,19 @@ html, body {
 /* ---- Game Main ---- */
 .game-main {
   display: flex;
-  gap: var(--space-4);
+  gap: clamp(16px, 1.5vw, 40px);
   flex: 1;
   min-height: 0;
+  align-items: stretch; /* leaderboard becomes a full-height right column */
+
+/* Maze occupies (and centers within) the space left of the docked leaderboard */
+}
+.maze-area {
+  flex: 1;
+  min-width: 0;
+  display: flex;
   align-items: flex-start;
+  justify-content: center;
 }
 
 #game-canvas {
@@ -217,7 +248,7 @@ html, body {
   color: var(--color-text-muted);
   cursor: pointer;
   font-family: var(--font-family-mono);
-  font-size: var(--font-size-small);
+  font-size: clamp(13px, 0.8vw, 18px);
   padding: var(--space-2) var(--space-3);
   transition: border-color 0.15s, color 0.15s;
   white-space: nowrap;
@@ -226,13 +257,13 @@ html, body {
 
 /* ---- Leaderboard Panel ---- */
 .leaderboard-panel {
-  width: 260px;
+  width: clamp(260px, 18vw, 380px);
   flex-shrink: 0;
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
-  padding: var(--space-4);
+  padding: clamp(16px, 1.2vw, 28px);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -243,7 +274,7 @@ html, body {
 .leaderboard-panel.collapsed { display: none; }
 
 .leaderboard-title {
-  font-size: var(--font-size-small);
+  font-size: clamp(13px, 0.85vw, 20px);
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--letter-spacing-eyebrow);
   text-transform: uppercase;
@@ -270,16 +301,16 @@ html, body {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
+  padding: clamp(8px, 0.7vw, 16px) clamp(12px, 0.9vw, 20px);
   border-radius: var(--radius-md);
   background: var(--color-surface-card);
-  font-size: var(--font-size-small);
+  font-size: clamp(13px, 0.85vw, 20px);
 }
 
 .lb-rank {
   font-weight: var(--font-weight-bold);
   font-family: var(--font-family-mono);
-  width: 20px;
+  width: clamp(20px, 1.4vw, 32px);
   color: var(--color-text-muted);
   flex-shrink: 0;
 }
@@ -540,6 +571,25 @@ html, body {
 .lb-row-me, .lb-full-row.lb-row-me {
   outline: 1px solid var(--color-primary);
   background: var(--color-surface);
+}
+
+/* ---- Day-3 winner reveal ---- */
+.lb-winner {
+  background: rgba(251, 191, 36, 0.10);
+  outline: 1px solid var(--color-warning);
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.25);
+}
+
+.lb-winner-banner {
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(13px, 0.9vw, 18px);
+  text-align: center;
+  color: var(--color-warning);
+  padding: var(--space-3);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  background: rgba(251, 191, 36, 0.08);
+  letter-spacing: 0;
 }
 
 /* ---- Full Leaderboard Screen ---- */

@@ -109,15 +109,12 @@ let blastFlash  = null; // { tiles: Set<string>, framesLeft: number }
 
 // Input
 const keys = {};
-let leaderboardExpanded = false;
+let leaderboardExpanded = true; // always-on for the event display
 
 // ── Init ───────────────────────────────────────────────
 function initGame() {
   canvas = document.getElementById('game-canvas');
   ctx    = canvas.getContext('2d');
-
-  canvas.width  = COLS * TILE;
-  canvas.height = ROWS * TILE;
 
   scaleCanvas();
   window.addEventListener('resize', scaleCanvas);
@@ -158,24 +155,36 @@ function startCountdown() {
 }
 
 function scaleCanvas() {
-  const SIDEBAR_W = leaderboardExpanded ? 280 : 0;
-  const HUD_H     = 80;
-  const PAD       = 40;
+  if (!canvas || !ctx) return;
+
+  // Reserve the real sidebar width (it scales with the viewport on TVs).
+  const panel     = document.querySelector('#screen-game .leaderboard-panel');
+  const SIDEBAR_W = (leaderboardExpanded && panel) ? panel.offsetWidth + 24 : 0;
+  const HUD_H     = 110; // room for the larger, TV-legible HUD
+  const PAD       = 48;
 
   const availW = window.innerWidth  - SIDEBAR_W - PAD;
   const availH = window.innerHeight - HUD_H     - PAD;
 
-  const scaleX = availW / (COLS * TILE);
-  const scaleY = availH / (ROWS * TILE);
-  const scale  = Math.min(scaleX, scaleY, 1);
+  // Fit the maze to the available space — and let it scale UP to fill a TV
+  // (no 1× cap), keeping the maze the dominant element on the screen.
+  const scale = Math.max(0.1, Math.min(availW / (COLS * TILE), availH / (ROWS * TILE)));
+  const cssW  = Math.floor(COLS * TILE * scale);
+  const cssH  = Math.floor(ROWS * TILE * scale);
+  canvas.style.width  = `${cssW}px`;
+  canvas.style.height = `${cssH}px`;
 
-  canvas.style.width  = `${Math.floor(COLS * TILE * scale)}px`;
-  canvas.style.height = `${Math.floor(ROWS * TILE * scale)}px`;
+  // Render at device resolution so the upscaled maze stays crisp on 1080p/4K.
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = Math.floor(cssW * dpr);
+  canvas.height = Math.floor(cssH * dpr);
+  // Map logical maze coords (COLS*TILE × ROWS*TILE) onto the device-pixel canvas.
+  ctx.setTransform(canvas.width / (COLS * TILE), 0, 0, canvas.height / (ROWS * TILE), 0, 0);
 }
 
 function toggleLeaderboard() {
   leaderboardExpanded = !leaderboardExpanded;
-  const panel = document.querySelector('.leaderboard-panel');
+  const panel = document.querySelector('#screen-game .leaderboard-panel');
   panel.classList.toggle('collapsed', !leaderboardExpanded);
   scaleCanvas();
 }
@@ -190,6 +199,13 @@ function medalClass(rank) {
   return rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
 }
 
+// True once the event reaches its final day — switches the board into the
+// celebratory "winners" reveal (top 3 get the gold/glow treatment + banner).
+function isWinnerReveal() {
+  const C = BugHunterData.EVENT_CONFIG;
+  return BugHunterData.eventDayNumber() >= C.totalDays;
+}
+
 // Compact sidebar board: rank · nickname · cumulative
 async function renderLeaderboard() {
   const listEl = document.getElementById('leaderboard-list');
@@ -199,34 +215,68 @@ async function renderLeaderboard() {
     listEl.innerHTML = '<div class="leaderboard-empty">No scores yet</div>';
     return;
   }
-  const me = (window.playerEmail || '').toLowerCase();
-  listEl.innerHTML = rows.slice(0, 15).map(r => `
-    <div class="lb-row${r.email === me ? ' lb-row-me' : ''}">
+  const me     = (window.playerEmail || '').toLowerCase();
+  const reveal = isWinnerReveal();
+  listEl.innerHTML = rows.slice(0, 15).map(r => {
+    const winner = reveal && r.rank <= 3 ? ' lb-winner' : '';
+    const crown  = reveal && r.rank === 1 ? '👑 ' : '';
+    return `
+    <div class="lb-row${r.email === me ? ' lb-row-me' : ''}${winner}">
       <span class="lb-rank ${medalClass(r.rank)}">${r.rank}</span>
-      <span class="lb-name">${escapeHtml(r.nickname)}</span>
+      <span class="lb-name">${crown}${escapeHtml(r.nickname)}</span>
       <span class="lb-score">${r.cumulative}</span>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+}
+
+// Top-5 teaser on the landing screen (social proof / "be the first" nudge)
+async function renderLandingLeaderboard() {
+  const listEl = document.getElementById('landing-lb-list');
+  if (!listEl) return;
+  const rows = await BugHunterData.getLeaderboard();
+  if (!rows.length) {
+    listEl.innerHTML = '<div class="leaderboard-empty">No scores yet — be the first!</div>';
+    return;
+  }
+  const reveal = isWinnerReveal();
+  listEl.innerHTML = rows.slice(0, 5).map(r => {
+    const winner = reveal && r.rank <= 3 ? ' lb-winner' : '';
+    const crown  = reveal && r.rank === 1 ? '👑 ' : '';
+    return `
+    <div class="lb-row${winner}">
+      <span class="lb-rank ${medalClass(r.rank)}">${r.rank}</span>
+      <span class="lb-name">${crown}${escapeHtml(r.nickname)}</span>
+      <span class="lb-score">${r.cumulative}</span>
+    </div>`;
+  }).join('');
 }
 
 // Full board with the per-day breakdown (View Leaderboard screen)
 async function renderFullLeaderboard() {
   const listEl = document.getElementById('lb-full-list');
   if (!listEl) return;
-  const rows = await BugHunterData.getLeaderboard();
+  const rows   = await BugHunterData.getLeaderboard();
+  const reveal = isWinnerReveal();
+  const banner = document.getElementById('lb-winner-banner');
+  if (banner) banner.classList.toggle('hidden', !reveal || !rows.length);
   if (!rows.length) {
     listEl.innerHTML = '<div class="leaderboard-empty">No scores yet</div>';
     return;
   }
   const me = (window.playerEmail || '').toLowerCase();
-  listEl.innerHTML = rows.map(r => `
-    <div class="lb-full-row${r.email === me ? ' lb-row-me' : ''}">
+  listEl.innerHTML = rows.map(r => {
+    const winner = reveal && r.rank <= 3 ? ' lb-winner' : '';
+    const crown  = reveal && r.rank === 1 ? '👑 ' : '';
+    return `
+    <div class="lb-full-row${r.email === me ? ' lb-row-me' : ''}${winner}">
       <span class="lbf-rank ${medalClass(r.rank)}">${r.rank}</span>
-      <span class="lbf-name">${escapeHtml(r.nickname)}</span>
+      <span class="lbf-name">${crown}${escapeHtml(r.nickname)}</span>
       <span class="lbf-day">${r.dayBests[1] ?? 0}</span>
       <span class="lbf-day">${r.dayBests[2] ?? 0}</span>
       <span class="lbf-day">${r.dayBests[3] ?? 0}</span>
       <span class="lbf-total">${r.cumulative}</span>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 let lbReturnScreen = 'landing';
@@ -801,7 +851,7 @@ function updateHUD() {
 
 // ── Rendering ──────────────────────────────────────────
 function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0, 0, COLS * TILE, ROWS * TILE); // logical bounds (ctx is scaled)
   drawMaze();
   drawGrid();
   drawDots();
@@ -1067,6 +1117,7 @@ document.getElementById('btn-play-again').addEventListener('click', () => {
   gameActive = false;
   resetRegistration();
   showScreen('landing');
+  renderLandingLeaderboard(); // refresh standings for the next player
 });
 
 function resetRegistration() {
@@ -1088,3 +1139,6 @@ document.getElementById('btn-limit-lb').addEventListener('click', () => {
 document.getElementById('btn-lb-back').addEventListener('click', () => {
   showScreen(lbReturnScreen);
 });
+
+// Populate the landing top-5 on first load (the default visible screen).
+renderLandingLeaderboard();

@@ -15,37 +15,49 @@
   <!-- Landing Screen -->
   <div id="screen-landing" class="screen active">
     <div class="landing-glow"></div>
-    <div class="landing-card">
-      <div class="landing-eyebrow">Testsigma presents</div>
-      <h1 class="landing-title">bug <span class="accent">hunt</span></h1>
-      <p class="landing-subtitle">Navigate the maze. Cover every path. Catch the bugs.</p>
+    <div class="landing-layout">
+      <div class="landing-card-area">
+        <div class="landing-card">
+          <div class="landing-eyebrow">Testsigma presents</div>
+          <h1 class="landing-title">bug <span class="accent">hunt</span></h1>
+          <p class="landing-subtitle">Navigate the maze. Cover every path. Catch the bugs.</p>
 
-      <div class="how-to-play">
-        <div class="htp-title">How to play</div>
-        <ul class="htp-rules">
-          <li>Navigate the maze and collect all dots within 45 seconds</li>
-          <li>Bugs patrol and chase you — touching one costs a life (3 total)</li>
-          <li>Place bombs to catch bugs — 4 per game, max 2 active at once</li>
-        </ul>
-        <div class="htp-keys">
-          <div class="htp-key"><span class="kbd">↑ ↓ ← →</span> / <span class="kbd">W A S D</span> Move</div>
-          <div class="htp-key"><span class="kbd">Space</span> / <span class="kbd">B</span> Place bomb</div>
-          <div class="htp-key"><span class="kbd">L</span> Toggle leaderboard</div>
+          <div class="how-to-play">
+            <div class="htp-title">How to play</div>
+            <ul class="htp-rules">
+              <li>Navigate the maze and collect all dots within 45 seconds</li>
+              <li>Bugs patrol and chase you — touching one costs a life (3 total)</li>
+              <li>Place bombs to catch bugs — 4 per game, max 2 active at once</li>
+            </ul>
+            <div class="htp-keys">
+              <div class="htp-key"><span class="kbd">↑ ↓ ← →</span> / <span class="kbd">W A S D</span> Move</div>
+              <div class="htp-key"><span class="kbd">Space</span> / <span class="kbd">B</span> Place bomb</div>
+              <div class="htp-key"><span class="kbd">L</span> Toggle leaderboard</div>
+            </div>
+          </div>
+
+          <form id="form-register" class="register-form" novalidate>
+            <div class="field">
+              <label for="input-name">Your name / nickname</label>
+              <input id="input-name" type="text" placeholder="e.g. QA Ninja" autocomplete="off" required />
+            </div>
+            <div class="field">
+              <label for="input-email">Email address</label>
+              <input id="input-email" type="email" placeholder="you@testsigma.com" autocomplete="off" required />
+            </div>
+            <div id="form-error" class="form-error hidden"></div>
+            <button type="submit" class="btn-primary">Start Game</button>
+          </form>
         </div>
       </div>
 
-      <form id="form-register" class="register-form" novalidate>
-        <div class="field">
-          <label for="input-name">Your name / nickname</label>
-          <input id="input-name" type="text" placeholder="e.g. QA Ninja" autocomplete="off" required />
+      <!-- Top-5 docked to the right, mirroring the game screen -->
+      <div class="leaderboard-panel landing-board">
+        <div class="leaderboard-title">Top Players</div>
+        <div id="landing-lb-list" class="leaderboard-list">
+          <div class="leaderboard-empty">No scores yet — be the first!</div>
         </div>
-        <div class="field">
-          <label for="input-email">Email address</label>
-          <input id="input-email" type="email" placeholder="you@testsigma.com" autocomplete="off" required />
-        </div>
-        <div id="form-error" class="form-error hidden"></div>
-        <button type="submit" class="btn-primary">Start Game</button>
-      </form>
+      </div>
     </div>
   </div>
 
@@ -79,9 +91,11 @@
 
       <!-- Main area: canvas + leaderboard -->
       <div class="game-main">
-        <canvas id="game-canvas"></canvas>
+        <div class="maze-area">
+          <canvas id="game-canvas"></canvas>
+        </div>
 
-        <!-- Leaderboard sidebar -->
+        <!-- Leaderboard sidebar (docked right) -->
         <div class="leaderboard-panel">
           <div class="leaderboard-title">Leaderboard</div>
           <div id="leaderboard-list" class="leaderboard-list">
@@ -157,6 +171,7 @@
   <!-- Full Leaderboard Screen -->
   <div id="screen-leaderboard" class="screen">
     <div class="lb-full-card">
+      <div id="lb-winner-banner" class="lb-winner-banner hidden">🏆 Event Winners 🏆</div>
       <h2 class="lb-full-title">Leaderboard</h2>
       <p class="lb-full-sub">Cumulative = best of each day, added across the event</p>
       <div class="lb-full-head">

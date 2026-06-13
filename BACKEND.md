@@ -38,11 +38,13 @@ create or replace view leaderboard as
 with daily_best as (              -- best score per player per day
   select email, day, max(score) as best
   from plays
+  where day between 1 and 3       -- ignore pre-event test plays (day <= 0)
   group by email, day
 ),
 latest_nick as (                  -- most recent nickname each player used
   select distinct on (email) email, nickname
   from plays
+  where day between 1 and 3
   order by email, created_at desc
 )
 select
@@ -109,7 +111,7 @@ Update `getLeaderboard()` to surface `isMe` and have the UI key off that instead
 |---|---|---|
 | `SUPABASE_URL` | project URL | no |
 | `SUPABASE_SERVICE_ROLE_KEY` | server-side writes/reads (bypasses RLS) | **yes** |
-| `EVENT_START_DATE` | Day-1 anchor, e.g. `2026-06-13` | no |
+| `EVENT_START_DATE` | Day-1 anchor — `2026-06-16` (event runs Jun 16–18) | no |
 | `EVENT_TIMEZONE` | `Europe/Oslo` | no |
 
 Never commit these. The anon key isn't needed client-side if all access is via functions.
