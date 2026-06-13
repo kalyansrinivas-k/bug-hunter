@@ -139,6 +139,7 @@
           <span id="go-final" class="score-value gradient-text">0</span>
         </div>
       </div>
+      <div id="go-rank" class="go-rank hidden"></div>
       <button id="btn-play-again" class="btn-primary">New Game</button>
       <button id="btn-leaderboard" class="btn-secondary">View Leaderboard</button>
     </div>
@@ -150,6 +151,26 @@
       <h2 class="landing-title">That's a wrap!</h2>
       <p class="landing-subtitle">You've used all 3 attempts for today.<br/>Come back tomorrow to keep climbing the leaderboard.</p>
       <button id="btn-limit-lb" class="btn-secondary">View Leaderboard</button>
+    </div>
+  </div>
+
+  <!-- Full Leaderboard Screen -->
+  <div id="screen-leaderboard" class="screen">
+    <div class="lb-full-card">
+      <h2 class="lb-full-title">Leaderboard</h2>
+      <p class="lb-full-sub">Cumulative = best of each day, added across the event</p>
+      <div class="lb-full-head">
+        <span class="lbf-rank">#</span>
+        <span class="lbf-name">Player</span>
+        <span class="lbf-day">D1</span>
+        <span class="lbf-day">D2</span>
+        <span class="lbf-day">D3</span>
+        <span class="lbf-total">Total</span>
+      </div>
+      <div id="lb-full-list" class="lb-full-list">
+        <div class="leaderboard-empty">No scores yet</div>
+      </div>
+      <button id="btn-lb-back" class="btn-primary">Back</button>
     </div>
   </div>
 

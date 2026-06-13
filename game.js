@@ -125,6 +125,7 @@ function initGame() {
   resetGame();
   bindInput();
   showScreen('game');
+  renderLeaderboard(); // show current standings in the sidebar from the start
   animFrame = requestAnimationFrame(gameLoop);
   startCountdown();
 }
@@ -177,6 +178,62 @@ function toggleLeaderboard() {
   const panel = document.querySelector('.leaderboard-panel');
   panel.classList.toggle('collapsed', !leaderboardExpanded);
   scaleCanvas();
+}
+
+// ── Leaderboard rendering (reads through the data layer) ──
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+function medalClass(rank) {
+  return rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+}
+
+// Compact sidebar board: rank · nickname · cumulative
+async function renderLeaderboard() {
+  const listEl = document.getElementById('leaderboard-list');
+  if (!listEl) return;
+  const rows = await BugHunterData.getLeaderboard();
+  if (!rows.length) {
+    listEl.innerHTML = '<div class="leaderboard-empty">No scores yet</div>';
+    return;
+  }
+  const me = (window.playerEmail || '').toLowerCase();
+  listEl.innerHTML = rows.slice(0, 15).map(r => `
+    <div class="lb-row${r.email === me ? ' lb-row-me' : ''}">
+      <span class="lb-rank ${medalClass(r.rank)}">${r.rank}</span>
+      <span class="lb-name">${escapeHtml(r.nickname)}</span>
+      <span class="lb-score">${r.cumulative}</span>
+    </div>`).join('');
+}
+
+// Full board with the per-day breakdown (View Leaderboard screen)
+async function renderFullLeaderboard() {
+  const listEl = document.getElementById('lb-full-list');
+  if (!listEl) return;
+  const rows = await BugHunterData.getLeaderboard();
+  if (!rows.length) {
+    listEl.innerHTML = '<div class="leaderboard-empty">No scores yet</div>';
+    return;
+  }
+  const me = (window.playerEmail || '').toLowerCase();
+  listEl.innerHTML = rows.map(r => `
+    <div class="lb-full-row${r.email === me ? ' lb-row-me' : ''}">
+      <span class="lbf-rank ${medalClass(r.rank)}">${r.rank}</span>
+      <span class="lbf-name">${escapeHtml(r.nickname)}</span>
+      <span class="lbf-day">${r.dayBests[1] ?? 0}</span>
+      <span class="lbf-day">${r.dayBests[2] ?? 0}</span>
+      <span class="lbf-day">${r.dayBests[3] ?? 0}</span>
+      <span class="lbf-total">${r.cumulative}</span>
+    </div>`).join('');
+}
+
+let lbReturnScreen = 'landing';
+function showLeaderboardScreen(fromScreen) {
+  lbReturnScreen = fromScreen || 'landing';
+  renderFullLeaderboard();
+  showScreen('leaderboard');
 }
 
 function resetGame() {
@@ -699,12 +756,24 @@ async function endGame() {
 
   // Persist this play. The daily limit is re-checked at registration when
   // the next game starts, so no per-button gating is needed here.
+  const rankEl = document.getElementById('go-rank');
+  rankEl.classList.add('hidden');
   if (window.playerEmail) {
     await BugHunterData.recordPlay({
       email:    window.playerEmail,
       nickname: window.playerName,
       score:    finalScore,
     });
+    // Show where this player now stands.
+    const board = await BugHunterData.getLeaderboard();
+    const me    = board.find(r => r.email === window.playerEmail.toLowerCase());
+    if (me) {
+      rankEl.innerHTML =
+        `Rank <span class="go-rank-num">#${me.rank}</span> of ${board.length}` +
+        ` · ${me.cumulative} pts cumulative`;
+      rankEl.classList.remove('hidden');
+    }
+    renderLeaderboard(); // refresh the sidebar with the new score
   }
 
   showScreen('gameover');
@@ -1009,9 +1078,13 @@ function resetRegistration() {
 }
 
 document.getElementById('btn-leaderboard').addEventListener('click', () => {
-  // placeholder — leaderboard feature added in Feature 6
+  showLeaderboardScreen('gameover');
 });
 
 document.getElementById('btn-limit-lb').addEventListener('click', () => {
-  // placeholder
+  showLeaderboardScreen('limit');
+});
+
+document.getElementById('btn-lb-back').addEventListener('click', () => {
+  showScreen(lbReturnScreen);
 });
