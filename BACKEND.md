@@ -23,7 +23,7 @@ create table plays (
   email       text        not null,
   nickname    text        not null,
   score       int         not null check (score between 0 and 100),
-  day         int         not null check (day between 1 and 3),  -- event day number
+  day         int         not null,  -- event day number; pre-event plays use <= 0
   created_at  timestamptz not null default now()
 );
 
