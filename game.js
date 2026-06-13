@@ -210,18 +210,17 @@ function isWinnerReveal() {
 async function renderLeaderboard() {
   const listEl = document.getElementById('leaderboard-list');
   if (!listEl) return;
-  const rows = await BugHunterData.getLeaderboard();
+  const rows = await BugHunterData.getLeaderboard(window.playerEmail);
   if (!rows.length) {
     listEl.innerHTML = '<div class="leaderboard-empty">No scores yet</div>';
     return;
   }
-  const me     = (window.playerEmail || '').toLowerCase();
   const reveal = isWinnerReveal();
   listEl.innerHTML = rows.slice(0, 15).map(r => {
     const winner = reveal && r.rank <= 3 ? ' lb-winner' : '';
     const crown  = reveal && r.rank === 1 ? '👑 ' : '';
     return `
-    <div class="lb-row${r.email === me ? ' lb-row-me' : ''}${winner}">
+    <div class="lb-row${r.isMe ? ' lb-row-me' : ''}${winner}">
       <span class="lb-rank ${medalClass(r.rank)}">${r.rank}</span>
       <span class="lb-name">${crown}${escapeHtml(r.nickname)}</span>
       <span class="lb-score">${r.cumulative}</span>
@@ -255,7 +254,7 @@ async function renderLandingLeaderboard() {
 async function renderFullLeaderboard() {
   const listEl = document.getElementById('lb-full-list');
   if (!listEl) return;
-  const rows   = await BugHunterData.getLeaderboard();
+  const rows   = await BugHunterData.getLeaderboard(window.playerEmail);
   const reveal = isWinnerReveal();
   const banner = document.getElementById('lb-winner-banner');
   if (banner) banner.classList.toggle('hidden', !reveal || !rows.length);
@@ -263,12 +262,11 @@ async function renderFullLeaderboard() {
     listEl.innerHTML = '<div class="leaderboard-empty">No scores yet</div>';
     return;
   }
-  const me = (window.playerEmail || '').toLowerCase();
   listEl.innerHTML = rows.map(r => {
     const winner = reveal && r.rank <= 3 ? ' lb-winner' : '';
     const crown  = reveal && r.rank === 1 ? '👑 ' : '';
     return `
-    <div class="lb-full-row${r.email === me ? ' lb-row-me' : ''}${winner}">
+    <div class="lb-full-row${r.isMe ? ' lb-row-me' : ''}${winner}">
       <span class="lbf-rank ${medalClass(r.rank)}">${r.rank}</span>
       <span class="lbf-name">${crown}${escapeHtml(r.nickname)}</span>
       <span class="lbf-day">${r.dayBests[1] ?? 0}</span>
@@ -815,8 +813,8 @@ async function endGame() {
       score:    finalScore,
     });
     // Show where this player now stands.
-    const board = await BugHunterData.getLeaderboard();
-    const me    = board.find(r => r.email === window.playerEmail.toLowerCase());
+    const board = await BugHunterData.getLeaderboard(window.playerEmail);
+    const me    = board.find(r => r.isMe);
     if (me) {
       rankEl.innerHTML =
         `Rank <span class="go-rank-num">#${me.rank}</span> of ${board.length}` +

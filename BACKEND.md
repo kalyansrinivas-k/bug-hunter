@@ -81,6 +81,11 @@ select count(*) from plays where email = $1 and day = $2;
   (or expose a `security definer` RPC that returns the email-free columns). Simplest:
   route **both reads and writes through Netlify Functions** so the browser holds no
   Supabase keys at all.
+- **Harden the view** (defense in depth — the view bypasses RLS by default): run
+  `alter view leaderboard set (security_invoker = true);` so the view respects the
+  caller's RLS. anon/authenticated then see nothing; the functions (service_role)
+  still see everything. Our client never holds the URL or anon key anyway, so this is
+  belt-and-suspenders.
 
 ---
 

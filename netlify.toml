@@ -1,0 +1,18 @@
+# Bug Hunter — Netlify config
+# Static site at the repo root + serverless functions backed by Supabase.
+
+[build]
+  publish = "."
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# Friendly /api/* paths → the functions
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
