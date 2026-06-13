@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bug Hunter</title>
+  <title>bug hunt</title>
   <link rel="stylesheet" href="testsigma-tokens.css" />
   <link rel="stylesheet" href="style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -17,13 +17,13 @@
     <div class="landing-glow"></div>
     <div class="landing-card">
       <div class="landing-eyebrow">Testsigma presents</div>
-      <h1 class="landing-title">Bug<span class="accent">Hunter</span></h1>
+      <h1 class="landing-title">bug <span class="accent">hunt</span></h1>
       <p class="landing-subtitle">Navigate the maze. Cover every path. Catch the bugs.</p>
 
       <div class="how-to-play">
         <div class="htp-title">How to play</div>
         <ul class="htp-rules">
-          <li>Navigate the maze and collect all dots within 60 seconds</li>
+          <li>Navigate the maze and collect all dots within 45 seconds</li>
           <li>Bugs patrol and chase you — touching one costs a life (3 total)</li>
           <li>Place bombs to catch bugs — 4 per game, max 2 active at once</li>
         </ul>
@@ -139,7 +139,7 @@
           <span id="go-final" class="score-value gradient-text">0</span>
         </div>
       </div>
-      <button id="btn-play-again" class="btn-primary">Play Again</button>
+      <button id="btn-play-again" class="btn-primary">New Game</button>
       <button id="btn-leaderboard" class="btn-secondary">View Leaderboard</button>
     </div>
   </div>
@@ -153,6 +153,13 @@
     </div>
   </div>
 
+  <!-- Persistent attribution — visible on every screen -->
+  <div class="powered-by">
+    <span>Powered by</span>
+    <img src="testsigma-logo.svg" alt="Testsigma" class="powered-by-logo" />
+  </div>
+
+  <script src="data.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

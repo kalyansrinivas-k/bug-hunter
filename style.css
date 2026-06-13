@@ -490,5 +490,39 @@ html, body {
   flex-wrap: wrap;
 }
 
+/* ---- Powered by Testsigma (global footer badge) ---- */
+.powered-by {
+  position: fixed;
+  bottom: var(--space-4);
+  right: var(--space-6);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+.powered-by span {
+  font-size: 12px;
+  letter-spacing: var(--letter-spacing-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.powered-by-logo {
+  height: 22px;
+  width: auto;
+  display: block;
+}
+
+/* More prominent on the landing/cover screen so it's noticed up front */
+#screen-landing.active ~ .powered-by {
+  opacity: 0.9;
+  gap: var(--space-3);
+}
+#screen-landing.active ~ .powered-by span { font-size: 14px; }
+#screen-landing.active ~ .powered-by .powered-by-logo { height: 30px; }
+
 /* ---- Limit Screen ---- */
 #screen-limit.active { display: flex; }

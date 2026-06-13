@@ -49,7 +49,7 @@ The foundational game: maze, player movement, dot collection, lives, and timer.
 - Player-controlled tester character: moves up/down/left/right through corridors
 - Dots disappear when the player passes over them; collected dots are retained across lives
 - 3 lives per game session
-- 60-second countdown timer
+- 45-second countdown timer (short, punchy rounds tuned for an event queue; defined as a single `GAME_DURATION` constant)
 - Game ends when timer hits 0 OR player loses all 3 lives
 - On death: time pauses ~1 second, player respawns at start position, timer resumes
 - HUD always visible: countdown timer, lives remaining, current score, bombs remaining
@@ -67,13 +67,14 @@ Bugs that patrol and chase, with escalating pressure as the clock runs down.
 - Two movement modes: **patrol** (random corridor traversal) and **chase** (pathfind toward player)
 - Escalation schedule:
 
-| Time Window | Bug Count | Behavior |
+| Time Window (elapsed) | Bug Count | Behavior |
 |---|---|---|
-| 0–20s | 3 bugs | Mostly patrolling, slow speed |
-| 20–40s | 4 bugs (1 spawns) | 2 bugs switch to chase mode |
-| 40–60s | 5–6 bugs (1–2 more spawn) | All chasers faster, aggression peaks |
+| 0–15s | 3 bugs | Mostly patrolling, slow speed |
+| 15–30s | 4 bugs (1 spawns) | 2 bugs switch to chase mode |
+| 30–45s | 5–6 bugs (1–2 more spawn) | All chasers faster, aggression peaks |
 
-- Minimum 2 bugs in chase mode once the 20s mark is passed
+- Escalation triggers at 2/3 and 1/3 of the round remaining, scaled to the round length
+- Minimum 2 bugs in chase mode once the first escalation passes
 - Maximum 6 bugs at any time
 - **Touching an uncaught bug kills the player** (lose 1 life)
 
@@ -227,4 +228,4 @@ All questions resolved — no open items.
 | 3 | What if a player skips a day? | Missing day treated as 0 in cumulative score. |
 | 4 | Is the leaderboard public? | Yes — public URL, no login required to view. |
 | 5 | Overall winner calculation? | Sum of daily bests across Day 1 + Day 2 + Day 3. Top 3 announced end of Day 3. |
-| 6 | Bomb budget on death/respawn? | 4 bombs total for the full 60s session — no refill on respawn. |
+| 6 | Bomb budget on death/respawn? | 4 bombs total for the full round — no refill on respawn. |

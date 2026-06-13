@@ -8,6 +8,9 @@ const TILE   = 36;   // px per maze cell
 const COLS   = 21;
 const ROWS   = 17;
 const SPEED  = 6;    // px per frame — evenly divides TILE=36 (6 frames/tile)
+const GAME_DURATION = 45; // seconds of play — short, punchy rounds for an event queue
+const PLAYER_HITBOX = 26; // wall-collision box (centered in the 36px cell → 5px clearance)
+const TURN_TOL = 10;      // cornering forgiveness: turn within this many px of a tile line
 
 const COLORS = {
   wall:       '#2D1B4E',
@@ -18,6 +21,11 @@ const COLORS = {
   playerGlow: 'rgba(0,178,189,0.4)',
   background: '#1A0B2E',
 };
+
+// Player sprite — the Testsigma gear, spins as the player moves
+const playerSprite = new Image();
+playerSprite.src = 'testsigma-gear.svg';
+let playerSpin = 0;
 
 // One fixed color per bug slot (index 0–5); stays the same regardless of mode
 const BUG_COLORS = ['#EF4444','#F97316','#EAB308','#EC4899','#A855F7','#22C55E'];
@@ -81,7 +89,7 @@ let canvas, ctx;
 let maze, dots;
 let player;
 let lives, totalLives;
-let timeLeft, timerInterval;
+let timeLeft, timerInterval, timerRemainingMs, lastTickAt;
 let score;
 let totalDots, dotsEaten;
 let gameActive, gameOver;
@@ -178,7 +186,7 @@ function resetGame() {
   dotsEaten = 0;
   lives    = 3;
   totalLives = 3;
-  timeLeft = 60;
+  timeLeft = GAME_DURATION;
   score    = 0;
   gameActive = true;
   gameOver   = false;
@@ -227,19 +235,47 @@ const DEBUG = new URLSearchParams(location.search).has('debug');
 
 function startTimer() {
   clearInterval(timerInterval);
-  if (DEBUG) timeLeft = 10; // short timer for testing game over flow
-  timerInterval = setInterval(() => {
-    if (!gameActive || deathPause) return;
-    timeLeft--;
+  // Wall-clock based: measure real elapsed play-time so the countdown is
+  // immune to setInterval drift when the game loop is busy. Paused time
+  // (start countdown, death freeze) does not accrue.
+  timerRemainingMs = (DEBUG ? 10 : GAME_DURATION) * 1000;
+  timeLeft   = Math.ceil(timerRemainingMs / 1000);
+  lastTickAt = null;
+  updateHUD(); // show the correct starting time immediately (no stale value)
+  timerInterval = setInterval(tickTimer, 100); // 10x/s for smooth, accurate ticks
+}
+
+function tickTimer() {
+  if (!gameActive) return;
+  const now = performance.now();
+  // While paused, don't accrue time — just keep the reference point current.
+  if (deathPause) { lastTickAt = now; return; }
+  if (lastTickAt === null) { lastTickAt = now; return; }
+
+  timerRemainingMs -= now - lastTickAt;
+  lastTickAt = now;
+
+  const secs = Math.max(0, Math.ceil(timerRemainingMs / 1000));
+  if (secs !== timeLeft) {
+    timeLeft = secs;
     updateHUD();
     checkBugEscalation();
-    if (timeLeft <= 0) endGame();
-  }, DEBUG ? 300 : 1000); // 0.3s ticks in debug = ~3s total
+  }
+  if (timerRemainingMs <= 0) endGame();
 }
 
 // ── Input ──────────────────────────────────────────────
+let inputBound = false;
 function bindInput() {
+  if (inputBound) return; // attach listeners exactly once for the whole session
+  inputBound = true;
+
   document.addEventListener('keydown', e => {
+    // Never intercept keys while typing in a form field, or outside gameplay.
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    if (!gameActive) return;
+
     keys[e.key] = true;
     switch (e.key) {
       case 'ArrowUp':    case 'w': case 'W': player.nextDx=0;  player.nextDy=-SPEED; break;
@@ -266,32 +302,31 @@ function tileAt(px, py) {
   return maze[row][col];
 }
 
-// Can a sprite of `size` occupy pixel rect starting at (px, py)?
+// Can a `size`px box, centered within its cell, occupy the cell at (px, py)?
+// The box is centered so the sprite and its collision box share one center —
+// this is what keeps the gear from ever poking past where collision allows.
 function canMoveAt(px, py, size) {
-  const margin = 3;
-  const s = size - margin * 2;
-  const ox = margin, oy = margin;
+  const off = (TILE - size) / 2; // centering inset
   return (
-    tileAt(px + ox,       py + oy)       !== 1 &&
-    tileAt(px + ox + s,   py + oy)       !== 1 &&
-    tileAt(px + ox,       py + oy + s)   !== 1 &&
-    tileAt(px + ox + s,   py + oy + s)   !== 1
+    tileAt(px + off,        py + off)        !== 1 &&
+    tileAt(px + off + size, py + off)        !== 1 &&
+    tileAt(px + off,        py + off + size)  !== 1 &&
+    tileAt(px + off + size, py + off + size)  !== 1
   );
 }
 
-function canMove(px, py) { return canMoveAt(px, py, player.size); }
+function canMove(px, py) { return canMoveAt(px, py, PLAYER_HITBOX); }
 
 // Snap to nearest tile boundary (used for turns at junctions)
 function snapToGrid(v) {
   return Math.round(v / TILE) * TILE;
 }
 
-// Direction-aware snap when stopping at a wall.
-// Adds/subtracts the hitbox margin so we always land on the safe side.
+// Direction-aware snap when stopping at a wall. With a centered hitbox the
+// entity already halts tile-aligned, so we just settle onto that boundary.
 function snapOnHit(v, dv) {
-  const m = 3; // must match canMove margin
-  if (dv > 0) return Math.floor((v + m) / TILE) * TILE; // moving positive → snap back
-  if (dv < 0) return Math.ceil((v - m) / TILE) * TILE;  // moving negative → snap forward
+  if (dv > 0) return Math.floor(v / TILE) * TILE; // moving positive → land on the cell we're in
+  if (dv < 0) return Math.ceil(v / TILE) * TILE;  // moving negative → land on the cell we're in
   return snapToGrid(v);
 }
 
@@ -332,10 +367,11 @@ function escalateBugs2() {
 }
 
 function checkBugEscalation() {
-  if (bugEscalation === 0 && timeLeft <= 40) {
+  // Escalate at 2/3 and 1/3 of the round remaining, scaled to GAME_DURATION.
+  if (bugEscalation === 0 && timeLeft <= GAME_DURATION * 2 / 3) {
     bugEscalation = 1;
     escalateBugs1();
-  } else if (bugEscalation === 1 && timeLeft <= 20) {
+  } else if (bugEscalation === 1 && timeLeft <= GAME_DURATION / 3) {
     bugEscalation = 2;
     escalateBugs2();
   }
@@ -455,27 +491,32 @@ function checkBugCollisions() {
 
 // ── Player movement ────────────────────────────────────
 
-// True when coordinate is within SPEED px of a tile boundary on either side
-function nearBoundary(v) {
-  const mod = ((v % TILE) + TILE) % TILE;
-  return mod <= SPEED || mod >= (TILE - SPEED);
-}
-
 function movePlayer() {
   if (!gameActive || deathPause) return;
 
-  const wantNew    = player.nextDx !== player.dx || player.nextDy !== player.dy;
-  const stationary = player.dx === 0 && player.dy === 0;
-  const reversal   = (player.nextDx === -player.dx && player.dx !== 0) ||
+  // ── Direction changes (Pac-Man style) ────────────────
+  // The desired direction (nextDx/nextDy, set on keypress) persists until it
+  // can be satisfied, so an early or late press is never dropped — the turn
+  // happens at the next opportunity. Reversals flip instantly.
+  const wantNew = player.nextDx !== player.dx || player.nextDy !== player.dy;
+  if (wantNew) {
+    const reversal = (player.nextDx === -player.dx && player.dx !== 0) ||
                      (player.nextDy === -player.dy && player.dy !== 0);
-  const atBoundary = nearBoundary(player.x) && nearBoundary(player.y);
-
-  if (wantNew && (stationary || reversal || atBoundary)) {
-    const sx = reversal ? player.x : snapToGrid(player.x);
-    const sy = reversal ? player.y : snapToGrid(player.y);
-    if (reversal || canMove(sx + player.nextDx, sy + player.nextDy)) {
-      player.x = sx; player.y = sy;
-      player.dx = player.nextDx; player.dy = player.nextDy;
+    if (reversal) {
+      player.dx = player.nextDx;
+      player.dy = player.nextDy;
+    } else {
+      // Perpendicular / from-stop turn: allowed within a cornering window
+      // (TURN_TOL px before or after a tile line), snapping onto the line so
+      // the new corridor lines up. Only turns if that corridor is open.
+      const sx = snapToGrid(player.x);
+      const sy = snapToGrid(player.y);
+      const aligned = Math.abs(player.x - sx) <= TURN_TOL &&
+                      Math.abs(player.y - sy) <= TURN_TOL;
+      if (aligned && canMove(sx + player.nextDx, sy + player.nextDy)) {
+        player.x = sx; player.y = sy;
+        player.dx = player.nextDx; player.dy = player.nextDy;
+      }
     }
   }
 
@@ -628,7 +669,7 @@ function computeLiveScore() {
 }
 
 // ── End Game ───────────────────────────────────────────
-function endGame() {
+async function endGame() {
   gameActive = false;
   clearInterval(timerInterval);
 
@@ -655,6 +696,17 @@ function endGame() {
   document.getElementById('go-final').textContent     = String(finalScore).padStart(3, '0');
 
   cancelAnimationFrame(animFrame);
+
+  // Persist this play. The daily limit is re-checked at registration when
+  // the next game starts, so no per-button gating is needed here.
+  if (window.playerEmail) {
+    await BugHunterData.recordPlay({
+      email:    window.playerEmail,
+      nickname: window.playerName,
+      score:    finalScore,
+    });
+  }
+
   showScreen('gameover');
 }
 
@@ -742,33 +794,37 @@ function drawDots() {
 }
 
 function drawPlayer() {
-  const cx = player.x + player.size / 2 + 3;
-  const cy = player.y + player.size / 2 + 3;
-  const r  = player.size / 2;
+  // Draw on the true tile center, shared with the collision box.
+  const cx = player.x + TILE / 2;
+  const cy = player.y + TILE / 2;
 
-  // glow
-  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 1.8);
+  // Subtle glow kept inside the cell (radius < half-tile) so it never bleeds
+  // into adjacent walls.
+  const glowR = 15;
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
   grad.addColorStop(0, COLORS.playerGlow);
   grad.addColorStop(1, 'transparent');
   ctx.beginPath();
-  ctx.arc(cx, cy, r * 1.8, 0, Math.PI * 2);
+  ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
   ctx.fillStyle = grad;
   ctx.fill();
 
-  // body
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fillStyle = COLORS.player;
-  ctx.fill();
+  // Upright gear (brand stays readable) with a subtle breathing pulse.
+  playerSpin += 0.08; // a time phase, not a rotation
+  const pulse = 1 + Math.sin(playerSpin) * 0.04;
 
-  // eyes (direction indicator)
-  const eyeOffset = player.dx !== 0 ? { ex: player.dx > 0 ? 4 : -4, ey: -3 }
-                  : player.dy !== 0 ? { ex: 3, ey: player.dy > 0 ? 3 : -4 }
-                  : { ex: 3, ey: -3 };
-  ctx.beginPath();
-  ctx.arc(cx + eyeOffset.ex, cy + eyeOffset.ey, 2.5, 0, Math.PI * 2);
-  ctx.fillStyle = COLORS.background;
-  ctx.fill();
+  if (playerSprite.complete && playerSprite.naturalWidth) {
+    // 24px ≤ PLAYER_HITBOX (26), both centered → the gear can never extend
+    // past where collision allows, so it never overlaps a wall.
+    const size = 24 * pulse;
+    ctx.drawImage(playerSprite, cx - size / 2, cy - size / 2, size, size);
+  } else {
+    // fallback to the teal dot until the sprite loads
+    ctx.beginPath();
+    ctx.arc(cx, cy, 12, 0, Math.PI * 2);
+    ctx.fillStyle = COLORS.player;
+    ctx.fill();
+  }
 }
 
 function drawBugs() {
@@ -898,20 +954,30 @@ function showScreen(name) {
 }
 
 // ── Registration form ──────────────────────────────────
-document.getElementById('form-register').addEventListener('submit', e => {
+document.getElementById('form-register').addEventListener('submit', async e => {
   e.preventDefault();
   const name  = document.getElementById('input-name').value.trim();
   const email = document.getElementById('input-email').value.trim();
   const errEl = document.getElementById('form-error');
+  const submitBtn = e.target.querySelector('button[type="submit"]');
 
   if (!name) { showError(errEl, 'Please enter your name or nickname.'); return; }
   if (!isValidEmail(email)) { showError(errEl, 'Please enter a valid email address.'); return; }
 
   errEl.classList.add('hidden');
+
+  // Enforce the daily play limit before starting (PRD Feature 5).
+  submitBtn.disabled = true;
+  const remaining = await BugHunterData.attemptsRemaining(email);
+  submitBtn.disabled = false;
+
   // Store for later use (score submission etc.)
   window.playerName  = name;
   window.playerEmail = email;
 
+  if (remaining <= 0) { showScreen('limit'); return; }
+
+  window.attemptsRemaining = remaining;
   initGame();
 });
 
@@ -924,15 +990,23 @@ function isValidEmail(v) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 }
 
-// ── Play Again ─────────────────────────────────────────
+// ── New Game ───────────────────────────────────────────
+// Each game is its own session: return to registration for a fresh player/email.
 document.getElementById('btn-play-again').addEventListener('click', () => {
   cancelAnimationFrame(animFrame);
   clearInterval(timerInterval);
-  resetGame();
-  showScreen('game');
-  animFrame = requestAnimationFrame(gameLoop);
-  startCountdown();
+  gameActive = false;
+  resetRegistration();
+  showScreen('landing');
 });
+
+function resetRegistration() {
+  document.getElementById('input-name').value  = '';
+  document.getElementById('input-email').value = '';
+  document.getElementById('form-error').classList.add('hidden');
+  window.playerName = window.playerEmail = null;
+  window.attemptsRemaining = undefined;
+}
 
 document.getElementById('btn-leaderboard').addEventListener('click', () => {
   // placeholder — leaderboard feature added in Feature 6
