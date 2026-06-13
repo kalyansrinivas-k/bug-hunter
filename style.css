@@ -92,6 +92,10 @@ html, body {
   overflow-y: auto; /* tall card scrolls within its own area on short screens */
 }
 
+/* Landing leaderboard hugs its content (top-5), not the full screen height */
+.landing-board { align-self: flex-start; }
+.landing-board .leaderboard-list { flex: 0 0 auto; overflow: visible; }
+
 /* ---- Form ---- */
 .register-form { display: flex; flex-direction: column; gap: var(--space-4); }
 
@@ -369,6 +373,7 @@ html, body {
 
 .gameover-title.failed { color: var(--color-error); }
 .gameover-title.passed { color: var(--color-primary); }
+.gameover-title.conditional { color: var(--color-warning); }
 
 .go-subtitle {
   font-size: var(--font-size-small);

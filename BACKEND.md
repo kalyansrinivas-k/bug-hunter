@@ -34,17 +34,15 @@ create index plays_email_day_idx on plays (email, day);
 The whole ranking is one SQL view (this is why Postgres/Supabase fits so well):
 
 ```sql
-create or replace view leaderboard as
-with daily_best as (              -- best score per player per day
+create or replace view leaderboard with (security_invoker = true) as
+with daily_best as (              -- best score per player per day (all days)
   select email, day, max(score) as best
   from plays
-  where day between 1 and 3       -- ignore pre-event test plays (day <= 0)
   group by email, day
 ),
 latest_nick as (                  -- most recent nickname each player used
   select distinct on (email) email, nickname
   from plays
-  where day between 1 and 3
   order by email, created_at desc
 )
 select
@@ -60,6 +58,20 @@ join latest_nick n using (email)
 group by d.email, n.nickname
 order by cumulative desc;
 ```
+
+`cumulative` sums each player's best-per-day across **every** day, so the board is
+live during pre-event testing/demos. `day1_best/2/3` map to event days 1–3
+(June 16–18); pre-event they're 0 while `cumulative` reflects the real total.
+
+### Resetting for the event (manual, on the start day)
+On the morning of **June 16**, before play opens, clear the pre-event/test scores:
+```sql
+delete from plays;                  -- full reset (simplest)
+-- or, to keep history but exclude it:
+-- delete from plays where created_at < timestamp with time zone '2026-06-16 00:00+02';
+```
+After this, only event-day plays accumulate and `day1_best/2/3` line up with the
+event days.
 
 ### Play-count check (the 3/day gate)
 ```sql

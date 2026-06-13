@@ -785,9 +785,13 @@ async function endGame() {
   const titleEl    = document.getElementById('go-title');
   const subtitleEl = document.getElementById('go-subtitle');
   if (finalScore >= 80) {
-    titleEl.textContent    = 'BUILD PASSED';
+    titleEl.textContent    = 'SAFE TO SHIP';
     titleEl.className      = 'gameover-title passed';
     subtitleEl.textContent = 'Release unblocked — ship it';
+  } else if (finalScore > 60) {
+    titleEl.textContent    = 'CONDITIONAL GO';
+    titleEl.className      = 'gameover-title conditional';
+    subtitleEl.textContent = 'Ship with caution — a few bugs slipped through';
   } else {
     titleEl.textContent    = 'BUILD FAILED';
     titleEl.className      = 'gameover-title failed';
@@ -1104,7 +1108,13 @@ function showError(el, msg) {
 }
 
 function isValidEmail(v) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+  // Email is an identity key (never emailed), so the goal is to reject garbage
+  // and typos that would fragment a player's scores — not full RFC validation.
+  // Requires: single @, a dotted domain with valid labels, and a TLD of >=2 letters.
+  const email = String(v).trim();
+  if (email.length < 6 || email.length > 254) return false;
+  if (email.includes('..')) return false; // no consecutive dots
+  return /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/.test(email);
 }
 
 // ── New Game ───────────────────────────────────────────

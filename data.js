@@ -111,7 +111,8 @@ async function mockGetLeaderboard(meEmail) {
   const byEmail = new Map();
 
   for (const p of plays) {
-    if (p.day < 1 || p.day > EVENT_CONFIG.totalDays) continue; // event window only
+    // Count every play, so the board is live during pre-event testing/demos.
+    // The "reset" on the event start day is a manual DB clear (see BACKEND.md).
     if (!byEmail.has(p.email)) {
       byEmail.set(p.email, { email: p.email, nickname: p.nickname, dayBests: {} });
     }
@@ -122,8 +123,8 @@ async function mockGetLeaderboard(meEmail) {
   }
 
   const rows = [...byEmail.values()].map(entry => {
-    let cumulative = 0;
-    for (let d = 1; d <= EVENT_CONFIG.totalDays; d++) cumulative += entry.dayBests[d] ?? 0;
+    // Cumulative = sum of best-per-day across every day played.
+    const cumulative = Object.values(entry.dayBests).reduce((a, b) => a + b, 0);
     return {
       nickname:   entry.nickname,
       cumulative,
