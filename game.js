@@ -1117,6 +1117,67 @@ function isValidEmail(v) {
   return /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/.test(email);
 }
 
+// ── "Did you mean…" suggestions for common provider typos ──
+const COMMON_EMAIL_DOMAINS = [
+  'gmail.com', 'googlemail.com', 'outlook.com', 'hotmail.com', 'live.com',
+  'yahoo.com', 'icloud.com', 'me.com', 'proton.me', 'protonmail.com',
+  'aol.com', 'testsigma.com',
+];
+
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+      );
+    }
+  }
+  return dp[m][n];
+}
+
+// Returns a corrected email if the domain is a near-miss of a common provider, else null.
+function suggestEmail(email) {
+  const e  = String(email).trim().toLowerCase();
+  const at = e.lastIndexOf('@');
+  if (at < 1) return null;
+  const local = e.slice(0, at), domain = e.slice(at + 1);
+  if (!domain || COMMON_EMAIL_DOMAINS.includes(domain)) return null;
+  let best = null, bestDist = 3; // only suggest within edit-distance 1–2
+  for (const d of COMMON_EMAIL_DOMAINS) {
+    const dist = levenshtein(domain, d);
+    if (dist > 0 && dist < bestDist) { bestDist = dist; best = d; }
+  }
+  return best ? `${local}@${best}` : null;
+}
+
+(function wireEmailSuggestions() {
+  const input   = document.getElementById('input-email');
+  const suggest = document.getElementById('email-suggest');
+  if (!input || !suggest) return;
+
+  input.addEventListener('blur', () => {
+    const s = suggestEmail(input.value);
+    if (s && s !== input.value.trim().toLowerCase()) {
+      suggest.innerHTML = `Did you mean <button type="button" class="email-suggest-btn">${escapeHtml(s)}</button>?`;
+      suggest.classList.remove('hidden');
+      suggest.querySelector('button').addEventListener('click', () => {
+        input.value = s;
+        suggest.classList.add('hidden');
+      });
+    } else {
+      suggest.classList.add('hidden');
+    }
+  });
+
+  input.addEventListener('input', () => suggest.classList.add('hidden'));
+})();
+
 // ── New Game ───────────────────────────────────────────
 // Each game is its own session: return to registration for a fresh player/email.
 document.getElementById('btn-play-again').addEventListener('click', () => {
