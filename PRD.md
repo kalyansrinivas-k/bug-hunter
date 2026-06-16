@@ -69,13 +69,14 @@ Bugs that patrol and chase, with escalating pressure as the clock runs down.
 
 | Time Window (elapsed) | Bug Count | Behavior |
 |---|---|---|
-| 0–15s | 3 bugs | Mostly patrolling, slow speed |
-| 15–30s | 4 bugs (1 spawns) | 2 bugs switch to chase mode |
-| 30–45s | 5–6 bugs (1–2 more spawn) | All chasers faster, aggression peaks |
+| 0–15s | 3 bugs | All patrolling, slow speed |
+| 15–30s | 4 bugs (1 spawns) | 2 switch to chase; other 2 patrol |
+| 30–45s | 5 bugs (1 more spawns) | Still only 2 chasers; 3 patrol — more obstacles, not faster hunters |
 
 - Escalation triggers at 2/3 and 1/3 of the round remaining, scaled to the round length
-- Minimum 2 bugs in chase mode once the first escalation passes
-- Maximum 6 bugs at any time
+- **At most 2 bugs chase at a time**, all game; the rest patrol
+- **Chase speed (4) is capped below the player's speed (6)** — a chaser can always be out-run in a straight corridor, so pressure comes from pathfinding + obstacles, not raw speed
+- Maximum 5 bugs at any time
 - **Touching an uncaught bug kills the player** (lose 1 life)
 
 **Out of scope for this feature:** bomb interactions with bugs

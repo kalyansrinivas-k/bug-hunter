@@ -42,8 +42,7 @@ const BUG_GLOWS  = [
 // ── Bug constants ──────────────────────────────────────
 const BUG_SIZE         = TILE - 12; // slightly smaller than player (TILE-6)
 const BUG_SPEED_PATROL = 3;
-const BUG_SPEED_CHASE  = 4;
-const BUG_SPEED_FAST   = 6;
+const BUG_SPEED_CHASE  = 4; // capped below the player's 6 → chasers are always out-runnable
 // Six spread-out spawn tiles (path cells, away from player start at col 10 row 16)
 const BUG_SPAWN_TILES = [
   { col: 1,  row: 1  },
@@ -463,17 +462,23 @@ function spawnBugs(count) {
   for (let i = 0; i < count; i++) spawnBug(bugs.length);
 }
 
+// Make exactly `n` bugs chase (speed 4); the rest patrol (speed 3).
+// Chasers are capped at 2 all game so the player always has an escape.
+function setChasers(n) {
+  bugs.forEach((bug, i) => {
+    if (i < n) { bug.mode = 'chase';  bug.speed = BUG_SPEED_CHASE; }
+    else       { bug.mode = 'patrol'; bug.speed = BUG_SPEED_PATROL; }
+  });
+}
+
 function escalateBugs1() {
   spawnBug(bugs.length); // 4th bug
-  let assigned = 0;
-  for (const bug of bugs) {
-    if (assigned < 2) { bug.mode = 'chase'; bug.speed = BUG_SPEED_CHASE; assigned++; }
-  }
+  setChasers(2);
 }
 
 function escalateBugs2() {
-  while (bugs.length < 6) spawnBug(bugs.length); // 5th and 6th
-  for (const bug of bugs) { bug.mode = 'chase'; bug.speed = BUG_SPEED_FAST; }
+  while (bugs.length < 5) spawnBug(bugs.length); // 5th bug — peak is 5
+  setChasers(2);                                 // still only 2 chasers; the rest patrol
 }
 
 function checkBugEscalation() {
