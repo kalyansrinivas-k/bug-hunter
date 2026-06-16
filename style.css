@@ -593,6 +593,26 @@ html, body {
   background: var(--color-surface);
 }
 
+/* ---- Prize banner (leaderboard screens) ---- */
+.prize-banner {
+  background: var(--gradient-action);
+  color: var(--color-text);
+  font-weight: var(--font-weight-bold);
+  text-align: center;
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-pop);
+  line-height: var(--line-height-tight);
+}
+.prize-banner-lg { /* full leaderboard screen (TV) */
+  font-size: clamp(18px, 1.7vw, 34px);
+  padding: clamp(12px, 1vw, 22px) clamp(18px, 1.6vw, 32px);
+}
+.prize-banner-sm { /* landing "Top Players" panel */
+  font-size: var(--font-size-small);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+}
+
 /* ---- Day-3 winner reveal ---- */
 .lb-winner {
   background: rgba(251, 191, 36, 0.10);

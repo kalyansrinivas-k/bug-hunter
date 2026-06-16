@@ -259,6 +259,9 @@ async function renderFullLeaderboard() {
   const reveal = isWinnerReveal();
   const banner = document.getElementById('lb-winner-banner');
   if (banner) banner.classList.toggle('hidden', !reveal || !rows.length);
+  // On the winner-reveal day, the prize banner steps aside for the Winners banner.
+  const prize = document.getElementById('lb-prize-banner');
+  if (prize) prize.classList.toggle('hidden', reveal && rows.length > 0);
   if (!rows.length) {
     listEl.innerHTML = '<div class="leaderboard-empty">No scores yet</div>';
     return;
