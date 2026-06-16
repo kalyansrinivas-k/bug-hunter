@@ -7,7 +7,8 @@
 const TILE   = 36;   // px per maze cell
 const COLS   = 21;
 const ROWS   = 17;
-const SPEED  = 6;    // px per frame — evenly divides TILE=36 (6 frames/tile)
+const SPEED  = 6;    // px per step — evenly divides TILE=36 (6 steps/tile); keep tile-aligned
+const GAME_SPEED = 0.85;  // global tempo dial — 0.85 = 15% slower (player + bugs together). Tune feel here.
 const GAME_DURATION = 45; // seconds of play — short, punchy rounds for an event queue
 const PLAYER_HITBOX = 26; // wall-collision box (centered in the 36px cell → 5px clearance)
 const TURN_TOL = 10;      // cornering forgiveness: turn within this many px of a tile line
@@ -289,6 +290,7 @@ function resetGame() {
   dots     = buildDots();
   totalDots = dots.filter(Boolean).length; // count truthy entries
   dotsEaten = 0;
+  simAccum = 0; simLastTs = null; // restart the fixed-timestep clock
   lives    = 3;
   totalLives = 3;
   timeLeft = GAME_DURATION;
@@ -1059,11 +1061,33 @@ function drawBlast() {
 }
 
 // ── Game Loop ──────────────────────────────────────────
-function gameLoop() {
-  moveBugs();
-  movePlayer();
-  checkBombDetonations();
-  checkBugCollisions();
+// Fixed-timestep simulation: movement advances on a clock, not per animation
+// frame, so speed is identical on 60 / 120 / 144 Hz displays. The step rate is
+// 90% of the 60fps baseline → everything moves 10% slower. Rendering still
+// happens every frame for smoothness.
+const SIM_STEP_MS = (1000 / 60) / GAME_SPEED; // 60fps baseline ÷ tempo → 10% slower at 0.9
+let   simAccum    = 0;
+let   simLastTs   = null;
+
+function gameLoop(ts) {
+  if (simLastTs === null) simLastTs = ts;
+  let dt = ts - simLastTs;
+  simLastTs = ts;
+  if (!Number.isFinite(dt) || dt < 0) dt = 0;
+  if (dt > 250) dt = SIM_STEP_MS; // tab was hidden — don't burst-catch-up
+
+  simAccum += dt;
+  let steps = 0;
+  while (simAccum >= SIM_STEP_MS && steps < 5) { // cap catch-up per frame
+    moveBugs();
+    movePlayer();
+    checkBombDetonations();
+    checkBugCollisions();
+    simAccum -= SIM_STEP_MS;
+    steps++;
+  }
+  if (steps === 5) simAccum = 0; // drop any remaining backlog
+
   draw();
   animFrame = requestAnimationFrame(gameLoop);
 }
